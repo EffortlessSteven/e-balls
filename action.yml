@@ -1,84 +1,88 @@
-name: Release Balls
-description: Race the contributors behind a release or time window as a GIF and MP4
+name: e-balls
+description: Race occurrences of e in perl-lsp commit messages as a GIF and MP4
 branding:
-  icon: award
-  color: purple
+  icon: activity
+  color: green
+
 inputs:
   repository:
-    description: GitHub owner/repository to read
-    default: ${{ github.repository }}
-  token:
-    description: Read-only GitHub token for the source repository
-    default: ${{ github.token }}
-  releases:
-    description: Number of published releases when tag is empty
-    default: '1'
-  match:
-    description: Substring in release tags (empty matches all)
-    default: ''
-  tag:
-    description: Exact release tag; defaults to the triggering release (overrides releases and match)
-    default: ${{ github.event.release.tag_name }}
+    description: Public GitHub owner/repository to read
+    default: EffortlessMetrics/perl-lsp-swarm
+  ref:
+    description: Source branch to inspect
+    default: main
+  project:
+    description: Project name in the chart title
+    default: perl-lsp
   since:
-    description: Rank every PR merged in a window instead of releases, like 24h, 7d, 2w, or 2026-09-01 (overrides tag, releases, and match)
+    description: Completed UTC time window (7d)
+    default: 7d
+  end:
+    description: Optional exclusive UTC end date (YYYY-MM-DD), for a reproducible week
     default: ''
-  metric:
-    description: author, merger, or changes (added + deleted lines by author)
-    default: author
-  users:
-    description: Optional comma-separated GitHub logins
+  letter:
+    description: ASCII letter to count in full commit messages
+    default: e
+  avatar:
+    description: Optional path to a local PNG/JPEG portrait; defaults to the bundled Steven portrait
     default: ''
-  top:
-    description: Show the top N contributors; 0 shows everyone
-    default: '10'
+  data:
+    description: Optional saved counts JSON to re-render without fetching Git history
+    default: ''
   format:
     description: mp4, gif, or both
-    default: mp4
+    default: both
   output:
-    description: Output directory
-    default: release-balls-output
+    description: New output directory
+    default: e-balls-output
   asset-base-url:
-    description: Optional public asset directory URL for release-note embeds
+    description: Optional public URL prefix for links in embed.md
     default: ''
+
 outputs:
-  markdown:
-    description: Markdown file with GIF embeds and video links
-    value: ${{ steps.render.outputs.markdown }}
   directory:
-    description: Absolute directory containing generated media and JSON
+    description: Absolute directory containing the files
     value: ${{ steps.render.outputs.directory }}
+  markdown:
+    description: Embed markdown for the GIF and/or MP4
+    value: ${{ steps.render.outputs.markdown }}
   manifest:
-    description: JSON with rankings and generated file paths
+    description: JSON manifest path
     value: ${{ steps.render.outputs.manifest }}
   data:
-    description: Source GitHub release and PR snapshot
+    description: JSON input snapshot path
     value: ${{ steps.render.outputs.data }}
+
 runs:
   using: composite
   steps:
+    - uses: dtolnay/rust-toolchain@1.88
     - id: binary-key
       shell: bash
       run: |
-        digest=$(cat "$GITHUB_ACTION_PATH"/Cargo.toml "$GITHUB_ACTION_PATH"/Cargo.lock "$GITHUB_ACTION_PATH"/src/*.rs "$GITHUB_ACTION_PATH"/assets/*.ttf | sha256sum | cut -d ' ' -f 1)
-        echo "path=$(realpath -m "$GITHUB_ACTION_PATH/target/release/release-balls")" >> "$GITHUB_OUTPUT"
-        echo "key=release-balls-rust-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}-$digest" >> "$GITHUB_OUTPUT"
+        set -euo pipefail
+        digest=$(cat "$GITHUB_ACTION_PATH"/Cargo.toml "$GITHUB_ACTION_PATH"/Cargo.lock "$GITHUB_ACTION_PATH"/src/*.rs "$GITHUB_ACTION_PATH"/src/bin/*.rs "$GITHUB_ACTION_PATH"/assets/*.ttf | sha256sum | cut -d' ' -f1)
+        echo "path=$GITHUB_ACTION_PATH/target/release/e-balls" >> "$GITHUB_OUTPUT"
+        echo "key=e-balls-rust-${{ runner.os }}-${{ runner.arch }}-${{ runner.imageos }}-$digest" >> "$GITHUB_OUTPUT"
     - uses: actions/cache@v4
       id: binary
       with:
         path: ${{ steps.binary-key.outputs.path }}
         key: ${{ steps.binary-key.outputs.key }}
-    - name: Build Rust binary on cache miss
+    - name: Build e-balls on cache miss
       if: steps.binary.outputs.cache-hit != 'true'
       shell: bash
       run: |
+        set -euo pipefail
         if ! pkg-config --exists freetype2; then
           sudo apt-get update -qq
           sudo apt-get install -y -qq libfreetype6-dev pkg-config
         fi
-        cargo build --release --locked --manifest-path "$GITHUB_ACTION_PATH/Cargo.toml"
+        cargo build --release --locked --manifest-path "$GITHUB_ACTION_PATH/Cargo.toml" --bin e-balls
     - name: Install FFmpeg if missing
       shell: bash
       run: |
+        set -euo pipefail
         if ! command -v ffmpeg >/dev/null; then
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
@@ -86,25 +90,15 @@ runs:
     - id: render
       shell: bash
       env:
-        GH_TOKEN: ${{ inputs.token }}
-        RB_REPOSITORY: ${{ inputs.repository }}
-        RB_RELEASES: ${{ inputs.releases }}
-        RB_MATCH: ${{ inputs.match }}
-        RB_TAG: ${{ inputs.tag }}
-        RB_SINCE: ${{ inputs.since }}
-        RB_METRIC: ${{ inputs.metric }}
-        RB_USERS: ${{ inputs.users }}
-        RB_TOP: ${{ inputs.top }}
-        RB_FORMAT: ${{ inputs.format }}
-        RB_ASSET_BASE: ${{ inputs.asset-base-url }}
-        RB_OUTPUT: ${{ inputs.output }}
-      run: |
-        tag_args=()
-        if [[ -n "$RB_SINCE" ]]; then
-          tag_args=(--since "$RB_SINCE")
-        elif [[ -n "$RB_TAG" ]]; then
-          tag_args=(--tag "$RB_TAG")
-        fi
-        "$GITHUB_ACTION_PATH/target/release/release-balls" "${tag_args[@]}" \
-          --repo "$RB_REPOSITORY" --releases "$RB_RELEASES" --match "$RB_MATCH" \
-          --metric "$RB_METRIC" --users "$RB_USERS" --top "$RB_TOP" --format "$RB_FORMAT" --out "$RB_OUTPUT" --asset-base-url "$RB_ASSET_BASE"
+        EB_REPOSITORY: ${{ inputs.repository }}
+        EB_REF: ${{ inputs.ref }}
+        EB_PROJECT: ${{ inputs.project }}
+        EB_SINCE: ${{ inputs.since }}
+        EB_END: ${{ inputs.end }}
+        EB_LETTER: ${{ inputs.letter }}
+        EB_AVATAR: ${{ inputs.avatar }}
+        EB_DATA: ${{ inputs.data }}
+        EB_FORMAT: ${{ inputs.format }}
+        EB_OUTPUT: ${{ inputs.output }}
+        EB_ASSET_BASE: ${{ inputs.asset-base-url }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/action_render.sh"

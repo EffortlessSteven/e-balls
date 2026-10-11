@@ -98,3 +98,46 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
           compression-level: 0
+
+  action-smoke:
+    if: github.repository == 'EffortlessSteven/e-balls'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./
+        id: balls
+        with:
+          data: examples/perl-lsp-2026-10-04-teal/data.json
+          format: both
+          output: ${{ runner.temp }}/e-balls-action-smoke
+      - name: Verify Action outputs and playable media
+        shell: bash
+        env:
+          BALLS_DIRECTORY: ${{ steps.balls.outputs.directory }}
+          BALLS_MANIFEST: ${{ steps.balls.outputs.manifest }}
+          BALLS_DATA: ${{ steps.balls.outputs.data }}
+          BALLS_MARKDOWN: ${{ steps.balls.outputs.markdown }}
+        run: |
+          set -euo pipefail
+          test -f "$BALLS_DIRECTORY/e-balls.mp4"
+          test -f "$BALLS_DIRECTORY/e-balls.gif"
+          test -f "$BALLS_MANIFEST"
+          test -f "$BALLS_DATA"
+          test -f "$BALLS_MARKDOWN"
+          ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.mp4" -f null -
+          ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.gif" -f null -
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          directory = Path(os.environ['BALLS_DIRECTORY'])
+          data = json.loads(Path(os.environ['BALLS_DATA']).read_text())
+          manifest = json.loads(Path(os.environ['BALLS_MANIFEST']).read_text())
+          assert manifest['rows'] == [[row['label'], row['count']] for row in data['rows']]
+          assert [row['count'] for row in data['rows']] == [5773, 5691, 3809, 3292, 109, 4, 734]
+          assert 'e-balls.gif' in Path(os.environ['BALLS_MARKDOWN']).read_text()
+          assert 'e-balls.mp4' in Path(os.environ['BALLS_MARKDOWN']).read_text()
+          assert (directory / 'avatar.png').is_file()
+          PY

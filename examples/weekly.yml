@@ -1,4 +1,4 @@
-name: Weekly Release Balls
+name: Weekly e-balls
 on:
   schedule:
     - cron: '0 9 * * 1'
@@ -6,19 +6,19 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
   render:
     runs-on: ubuntu-latest
     steps:
-      - uses: maria-rcks/release-balls@v1
+      - uses: EffortlessSteven/e-balls@main
         id: balls
         with:
+          repository: EffortlessMetrics/perl-lsp-swarm
           since: 7d
           format: both
 
       - uses: actions/upload-artifact@v4
         with:
-          name: weekly-media
+          name: weekly-e-balls
           path: ${{ steps.balls.outputs.directory }}
