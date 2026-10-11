@@ -55,6 +55,22 @@ class RenderCliTests(unittest.TestCase):
             self.assertEqual(meta["streams"][0]["height"], width)
             self.assertAlmostEqual(float(meta["format"]["duration"]), 0.4, delta=0.1)
             subprocess.run(["ffmpeg", "-v", "error", "-xerror", "-i", str(file), "-f", "null", "-"], check=True)
+            frame = subprocess.check_output([
+                "ffmpeg", "-v", "error", "-i", str(file), "-frames:v", "1",
+                "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
+            ])
+            self.assertEqual(len(frame), width * width * 3)
+            # Lossy H.264/YUV and GIF palettes need a small color tolerance.
+            for actual, expected in zip(frame[:3], [245, 241, 232]):
+                self.assertLessEqual(abs(actual - expected), 4)
+            # Restrict ink checks to the title, excluding the blue portrait.
+            # At 320px YUV420 averages thin glyphs with cream; GIF keeps RGB.
+            title = frame[:width * (width // 5) * 3]
+            pixels = zip(title[0::3], title[1::3], title[2::3])
+            tolerance = 40 if suffix == "mp4" else 12
+            self.assertGreater(sum(all(abs(c - e) <= tolerance for c, e in zip(p, [21, 107, 118]))
+                                   for p in pixels), 10, suffix)
+
 
     def test_all_zeroes_still_render(self):
         for row in self.value["rows"]:

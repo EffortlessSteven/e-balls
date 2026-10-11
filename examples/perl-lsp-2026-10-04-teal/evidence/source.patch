@@ -1,0 +1,978 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 403c2d3..dfed948 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -58,14 +58,11 @@ jobs:
+             --repo "$RUNNER_TEMP/perl-lsp.git" \
+             --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
+             --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
+-            --start 2026-10-04 --end 2026-10-11 --out "$RUNNER_TEMP/e-counts.json"
++            --since 7d --end 2026-10-11 --out "$RUNNER_TEMP/e-counts.json"
+           python3 scripts/verify_counts.py --repo "$RUNNER_TEMP/perl-lsp.git" \
+             --data "$RUNNER_TEMP/e-counts.json" | tee verification/count-verification.json
+-          curl --fail --location --retry 3 --max-time 60 \
+-            'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
+-            --output "$RUNNER_TEMP/steven.png"
+           ./target/release/e-balls --data "$RUNNER_TEMP/e-counts.json" \
+-            --avatar "$RUNNER_TEMP/steven.png" --format both --out out
++            --avatar examples/perl-lsp-2026-10-04/avatar.png --format both --out out
+           cp verification/count-verification.json out/count-verification.json
+           ffmpeg -v error -xerror -i out/e-balls.mp4 -f null -
+           ffmpeg -v error -xerror -i out/e-balls.gif -f null -
+diff --git a/README.md b/README.md
+index ffe4448..5357d50 100644
+--- a/README.md
++++ b/README.md
+@@ -5,11 +5,11 @@
+ Occurrences of `E` in [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp)
+ (and [perl-lsp-swarm](https://github.com/EffortlessMetrics/perl-lsp-swarm)) commit messages in the past week.
+ 
+-![Occurrences of E in perl-lsp commit messages in the past week](examples/perl-lsp-2026-10-04/e-balls.gif)
++![Occurrences of E in perl-lsp commit messages in the past week](examples/perl-lsp-2026-10-04-teal/e-balls.gif)
+ 
+ *Top 7 perl-lsp days in the past week, rendered with `since: 7d`.*
+ 
+-October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04/e-balls.mp4).
++October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04-teal/e-balls.mp4).
+ 
+ ## Quick start
+ 
+@@ -27,13 +27,12 @@ python3 scripts/count_letters.py \
+   --repo ../perl-lsp-history.git \
+   --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
+   --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
+-  --start 2026-10-04 --end 2026-10-11 --out e-counts.json
++  --since 7d --end 2026-10-11 --out e-counts.json
+ 
+ # Independently recount the frozen snapshot from individual Git objects.
+ python3 scripts/verify_counts.py --repo ../perl-lsp-history.git --data e-counts.json
+ 
+-curl --fail --location 'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
+-  --output steven.png
++cp examples/perl-lsp-2026-10-04/avatar.png steven.png
+ 
+ ./target/release/e-balls --data e-counts.json --avatar steven.png --out out
+ ```
+@@ -47,9 +46,10 @@ Rendering is offline. It does not look up avatars from row labels. An unreadable
+ portrait is an error, not permission to replace your head with initials.
+ 
+ To measure the last seven **completed UTC days**, replace the pinned `--ref`
+-with the source's current branch and omit `--start` and `--end`. The collector
++with the source's current branch, keep `--since 7d`, and omit `--end`. The collector
+ records the resolved commit SHA before reading. `--days`, `--end`, and
+-`--letter` select other windows or ASCII letters.
++`--letter` select other windows or ASCII letters. `--since 7d` conflicts with
++explicit `--days` or `--start`.
+ 
+ ## What gets counted
+ 
+diff --git a/assets/README.md b/assets/README.md
+index 890e028..6263ec5 100644
+--- a/assets/README.md
++++ b/assets/README.md
+@@ -18,3 +18,22 @@ Pillow's separate license is retained in [Pillow-LICENSE.txt](Pillow-LICENSE.txt
+ Provenance checked on 2026-09-20: the 12,676-byte file matches Pillow 12.3.0's
+ embedded font bytes exactly. SHA-256:
+ `69853909b940023570964e29cffe30da95aea8de3627736b5cd15ab30143169f`.
++
++## e-balls typography and logo
++
++The explicit e-balls theme bundles unmodified **IBM Plex Sans Regular** for
++primary text and **IBM Plex Mono Regular** for dates, counts, and metadata.
++Both are from the official [IBM/plex](https://github.com/IBM/plex) repository,
++revision `763c36ef9117782905ae010056dfbe8fd2653a25`, under SIL OFL 1.1.
++The upstream legacy theme retains its original font selection.
++
++Exact download URLs and SHA-256 hashes for the fonts and licenses are recorded
++in [plex-manifest.json](plex-manifest.json). Licenses are retained separately in
++[IBMPlexSans-LICENSE.txt](IBMPlexSans-LICENSE.txt) and
++[IBMPlexMono-LICENSE.txt](IBMPlexMono-LICENSE.txt).
++
++The lowercase `e` in `logo.svg` is the Sans Regular `e` glyph converted to an
++SVG path using fontTools 4.66.1. Its ink bounds are scaled to 76 units high,
++flipped from font coordinates and centered at (150, 128). No SVG text or font
++embedding is used. Palette: teal `#156b76`, cream `#f5f1e8`.
++Font files belong in these source assets, never in example/evidence archives.
+diff --git a/assets/logo.svg b/assets/logo.svg
+index 47c57f0..6f73c33 100644
+--- a/assets/logo.svg
++++ b/assets/logo.svg
+@@ -1,13 +1,9 @@
+ <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+-  <title>Release Balls</title>
+-  <rect x="2" y="2" width="252" height="252" rx="58" fill="#fff" stroke="#e8e6f0" stroke-width="4"/>
+-  <circle cx="96" cy="128" r="74" fill="#7c5cff" opacity=".1"/>
+-  <circle cx="122" cy="128" r="74" fill="#7c5cff" opacity=".2"/>
+-  <circle cx="150" cy="128" r="74" fill="#7c5cff"/>
+-  <path d="M130 94V162M130 102Q130 132 176 132" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
+-  <g fill="#fff">
+-    <circle cx="130" cy="94" r="11"/>
+-    <circle cx="130" cy="162" r="11"/>
+-    <circle cx="176" cy="132" r="11"/>
+-  </g>
++  <title>e-balls</title>
++  <rect x="2" y="2" width="252" height="252" rx="58" fill="#f5f1e8" stroke="#156b76" stroke-width="4"/>
++  <circle cx="96" cy="128" r="74" fill="#156b76" opacity=".1"/>
++  <circle cx="122" cy="128" r="74" fill="#156b76" opacity=".2"/>
++  <circle cx="150" cy="128" r="74" fill="#156b76"/>
++  <!-- IBM Plex Sans Regular lowercase e; original outline centered by ink bounds. -->
++  <path fill="#f5f1e8" d="M150.63333333333333 166.0Q143.1740740740741 166.0 137.1925925925926 163.3259259259259Q131.2111111111111 160.65185185185183 126.91851851851852 155.65555555555554Q122.62592592592594 150.65925925925924 120.30370370370372 143.69259259259258Q117.9814814814815 136.7259259259259 117.9814814814815 128.0Q117.9814814814815 119.4148148148148 120.30370370370372 112.37777777777777Q122.62592592592594 105.34074074074073 126.91851851851852 100.34444444444443Q131.2111111111111 95.34814814814814 137.1925925925926 92.67407407407407Q143.1740740740741 89.99999999999999 150.63333333333333 89.99999999999999Q157.95185185185187 89.99999999999999 163.72222222222223 92.67407407407407Q169.4925925925926 95.34814814814814 173.57407407407408 100.06296296296296Q177.65555555555557 104.77777777777777 179.83703703703705 111.25185185185184Q182.01851851851853 117.7259259259259 182.01851851851853 125.46666666666665V130.8148148148148H129.80370370370372V134.19259259259258Q129.80370370370372 138.83703703703702 131.28148148148148 142.84814814814814Q132.75925925925927 146.85925925925926 135.5037037037037 149.8148148148148Q138.24814814814815 152.77037037037036 142.25925925925927 154.45925925925926Q146.2703703703704 156.14814814814815 151.33703703703705 156.14814814814815Q158.23333333333335 156.14814814814815 163.37037037037038 152.9111111111111Q168.5074074074074 149.67407407407407 171.32222222222225 143.6222222222222L179.34444444444446 149.3925925925926Q175.82592592592596 156.85185185185185 168.36666666666667 161.42592592592592Q160.90740740740742 166.0 150.63333333333333 166.0ZM150.63333333333333 99.42962962962962Q145.9888888888889 99.42962962962962 142.18888888888893 101.04814814814813Q138.3888888888889 102.66666666666666 135.64444444444445 105.6222222222222Q132.9 108.57777777777777 131.35185185185185 112.58888888888887Q129.80370370370372 116.6 129.80370370370372 121.38518518518518V122.37037037037035H169.91481481481483V120.82222222222221Q169.91481481481483 111.1111111111111 164.63703703703703 105.27037037037036Q159.35925925925926 99.42962962962962 150.63333333333333 99.42962962962962Z"/>
+ </svg>
+diff --git a/scripts/count_letters.py b/scripts/count_letters.py
+index 3a125e8..c7c4d38 100644
+--- a/scripts/count_letters.py
++++ b/scripts/count_letters.py
+@@ -149,6 +149,7 @@ def main() -> None:
+     parser.add_argument("--project", default="perl-lsp")
+     parser.add_argument("--letter", default="e")
+     group = parser.add_mutually_exclusive_group()
++    group.add_argument("--since", choices=["7d"], help="seven completed UTC days before --end (default today)")
+     group.add_argument("--start", type=dt.date.fromisoformat)
+     group.add_argument("--days", type=int, help="completed UTC days; default 7")
+     parser.add_argument("--end", type=dt.date.fromisoformat, default=dt.datetime.now(UTC).date(),
+diff --git a/src/bin/e-balls.rs b/src/bin/e-balls.rs
+index 8f97eb5..40c5c9a 100644
+--- a/src/bin/e-balls.rs
++++ b/src/bin/e-balls.rs
+@@ -1,7 +1,7 @@
+ use anyhow::{bail, Context, Result};
+ use clap::Parser;
+ use image::{ImageReader, Rgb, RgbImage};
+-use release_balls::render::{render_with, Options, Presentation};
++use release_balls::render::{render_with, Options, Presentation, Theme};
+ use serde::Deserialize;
+ use serde_json::json;
+ use std::fs;
+@@ -119,12 +119,16 @@ fn portrait(bytes: &[u8]) -> Result<RgbImage> {
+     if image.width() == 0 || image.height() == 0 {
+         bail!("avatar must not be empty");
+     }
+-    // Keep transparent portraits on the same white canvas as the original renderer.
++    // Composite transparency before resizing, using the same cream as the arena.
++    let background = Theme::EBalls.background();
+     Ok(RgbImage::from_fn(image.width(), image.height(), |x, y| {
+         let pixel = image.get_pixel(x, y);
+         let alpha = u32::from(pixel[3]);
+         Rgb(std::array::from_fn(|channel| {
+-            ((u32::from(pixel[channel]) * alpha + 255 * (255 - alpha) + 127) / 255) as u8
++            ((u32::from(pixel[channel]) * alpha
++                + u32::from(background[channel]) * (255 - alpha)
++                + 127)
++                / 255) as u8
+         }))
+     }))
+ }
+@@ -185,6 +189,7 @@ fn main() -> Result<()> {
+         singular: data.unit_singular.as_deref().unwrap_or(&data.unit),
+         plural: &data.unit,
+         avatar: Some(&image),
++        theme: Theme::EBalls,
+     };
+     // Preserve chronological/input order. Do not rank or normalize away small counts.
+     let rows: Vec<_> = data
+@@ -225,7 +230,10 @@ fn main() -> Result<()> {
+     fs::write(staging.path.join("data.json"), &bytes)?;
+     image.save(staging.path.join("avatar.png"))?;
+     let manifest = json!({
+-        "schema_version": 1, "renderer": "e-balls", "source_data": "data.json",
++        "schema_version": 1, "renderer": "e-balls",
++        "theme": {"name": "teal-cream", "background": "#f5f1e8", "foreground": "#156b76",
++            "primary_font": "IBM Plex Sans Regular", "data_font": "IBM Plex Mono Regular",
++            "font_sources": serde_json::from_str::<serde_json::Value>(include_str!("../../assets/plex-manifest.json"))?}, "source_data": "data.json",
+         "avatar": "avatar.png", "avatar_policy": "same supplied image on every row",
+         "row_order": "input", "speed": "linear count / maximum; fastest crosses in 1 second",
+         "duration_seconds": args.duration, "rows": rows, "files": files,
+@@ -248,6 +256,21 @@ mod tests {
+             "rows":[{"label":"Monday","count":0},{"label":"Tuesday","count":4}]})
+     }
+ 
++    #[test]
++    fn transparent_portrait_flattens_to_cream() -> Result<()> {
++        let mut rgba = image::RgbaImage::new(3, 1);
++        rgba.put_pixel(0, 0, image::Rgba([255, 0, 255, 0]));
++        rgba.put_pixel(1, 0, image::Rgba([21, 107, 118, 128]));
++        rgba.put_pixel(2, 0, image::Rgba([21, 107, 118, 255]));
++        let mut bytes = Cursor::new(Vec::new());
++        rgba.write_to(&mut bytes, image::ImageFormat::Png)?;
++        let image = portrait(bytes.get_ref())?;
++        assert_eq!(image.get_pixel(0, 0).0, [245, 241, 232]);
++        assert_eq!(image.get_pixel(1, 0).0, [133, 174, 175]);
++        assert_eq!(image.get_pixel(2, 0).0, [21, 107, 118]);
++        Ok(())
++    }
++
+     #[test]
+     fn accepts_arbitrary_rows_and_zeroes() -> Result<()> {
+         let data: Data = serde_json::from_value(value())?;
+diff --git a/src/render.rs b/src/render.rs
+index f9efb45..f0d19d7 100644
+--- a/src/render.rs
++++ b/src/render.rs
+@@ -20,6 +20,29 @@ pub struct Options {
+     pub strategy: String,
+ }
+ 
++/// The legacy CLI keeps its original palette and platform font selection.
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum Theme {
++    Legacy,
++    EBalls,
++}
++
++impl Theme {
++    pub fn background(self) -> [u8; 3] {
++        match self {
++            Self::Legacy => [255; 3],
++            Self::EBalls => [245, 241, 232],
++        }
++    }
++
++    fn ink(self, legacy: u8) -> [u8; 3] {
++        match self {
++            Self::Legacy => [legacy; 3],
++            Self::EBalls => [21, 107, 118],
++        }
++    }
++}
++
+ /// Labels are independent of avatar identity. A supplied image is reused for
+ /// every row; no avatar requests or fallback initials are used in that mode.
+ pub struct Presentation<'a> {
+@@ -29,6 +52,7 @@ pub struct Presentation<'a> {
+     pub singular: &'a str,
+     pub plural: &'a str,
+     pub avatar: Option<&'a RgbImage>,
++    pub theme: Theme,
+ }
+ 
+ struct Glyph {
+@@ -55,9 +79,16 @@ fn rounded(value: f64) -> i32 {
+     value.round_ties_even() as i32
+ }
+ 
+-fn font(library: &Library, size: u32) -> Result<Face> {
++fn font(library: &Library, size: u32, theme: Theme, mono: bool) -> Result<Face> {
+     let mac_font = Path::new("/System/Library/Fonts/HelveticaNeue.ttc");
+-    let face = if mac_font.exists() {
++    let face = if theme == Theme::EBalls {
++        let bytes: &[u8] = if mono {
++            include_bytes!("../assets/IBMPlexMono-Regular.ttf")
++        } else {
++            include_bytes!("../assets/IBMPlexSans-Regular.ttf")
++        };
++        library.new_memory_face(bytes.to_vec(), 0)?
++    } else if mac_font.exists() {
+         library.new_face(mac_font, 0)?
+     } else {
+         library.new_memory_face(include_bytes!("../assets/Aileron-Regular.ttf").to_vec(), 0)?
+@@ -129,7 +160,7 @@ fn text(face: &Face, value: &str) -> Result<Text> {
+ }
+ 
+ impl Text {
+-    fn draw(&self, canvas: &mut RgbImage, x: f64, y: i32, color: u8) {
++    fn draw(&self, canvas: &mut RgbImage, x: f64, y: i32, color: [u8; 3]) {
+         let x = x.round() as i32;
+         for glyph in &self.glyphs {
+             let top = y + self.ascender - glyph.top;
+@@ -146,9 +177,9 @@ impl Text {
+                     let alpha = u32::from(glyph.mask[row * glyph.width + column]);
+                     if alpha != 0 {
+                         let target = canvas.get_pixel_mut(target_x as u32, target_y as u32);
+-                        for channel in &mut target.0 {
++                        for (channel, ink) in target.0.iter_mut().zip(color) {
+                             *channel = ((u32::from(*channel) * (255 - alpha)
+-                                + u32::from(color) * alpha
++                                + u32::from(ink) * alpha
+                                 + 127)
+                                 / 255) as u8;
+                         }
+@@ -202,7 +233,7 @@ fn avatar(login: &str, client: &Client) -> Result<RgbImage> {
+ fn fallback_avatar(login: &str, library: &Library) -> Result<RgbImage> {
+     let mut image = RgbImage::from_pixel(128, 128, Rgb([228, 228, 231]));
+     let initials: String = login.chars().take(2).flat_map(char::to_uppercase).collect();
+-    text(&font(library, 36)?, &initials)?.draw(&mut image, 28.0, 42, 0);
++    text(&font(library, 36, Theme::Legacy, false)?, &initials)?.draw(&mut image, 28.0, 42, [0; 3]);
+     Ok(image)
+ }
+ 
+@@ -217,7 +248,7 @@ struct Sprite {
+     span: i32,
+ }
+ 
+-fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64) -> Sprite {
++fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64, background: [u8; 3]) -> Sprite {
+     let diameter = (radius * 2) as u32;
+     let side = source.width().min(source.height());
+     let crop = imageops::crop_imm(
+@@ -238,11 +269,12 @@ fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64) -> Sprite {
+         Luma([if inside { 255 } else { 0 }])
+     });
+     let mask = imageops::resize(&mask, diameter, diameter, FilterType::Lanczos3);
+-    // The accepted layout keeps the entire arena white, so flatten once.
++    // Flatten antialiased circular edges onto the selected arena once.
+     for (pixel, alpha) in ball.pixels_mut().zip(mask.pixels()) {
+         let alpha = u32::from(alpha[0]);
+-        for channel in &mut pixel.0 {
+-            *channel = ((u32::from(*channel) * alpha + 255 * (255 - alpha) + 127) / 255) as u8;
++        for (channel, base) in pixel.0.iter_mut().zip(background) {
++            *channel =
++                ((u32::from(*channel) * alpha + u32::from(base) * (255 - alpha) + 127) / 255) as u8;
+         }
+     }
+     Sprite {
+@@ -274,13 +306,15 @@ fn artwork(
+     width: u32,
+ ) -> Result<(Vec<u8>, Vec<Sprite>)> {
+     let library = Library::init()?;
++    let theme = presentation.theme;
++    let background = theme.background();
+     let scale = f64::from(width) * 2.0 / 1080.0;
+     let n = |value: f64| rounded(value * scale);
+-    let mut canvas = RgbImage::from_pixel(width * 2, width * 2, Rgb([255; 3]));
++    let mut canvas = RgbImage::from_pixel(width * 2, width * 2, Rgb(background));
+     let title = presentation.title;
+     let mut title_size = n(48.0) as u32;
+     let title = loop {
+-        let shaped = text(&font(&library, title_size)?, title)?;
++        let shaped = text(&font(&library, title_size, theme, false)?, title)?;
+         if shaped.advance <= f64::from(n(1000.0)) || title_size <= 1 {
+             break shaped;
+         }
+@@ -290,21 +324,33 @@ fn artwork(
+         &mut canvas,
+         (f64::from(width * 2) - f64::from(title.bounds[2] - title.bounds[0])) / 2.0,
+         n(80.0),
+-        0,
++        theme.ink(0),
+     );
+     let mut title_bottom = n(80.0) + title.bounds[3];
+     if !presentation.subtitle.is_empty() {
+-        let subtitle = fit_text(&library, presentation.subtitle, n(28.0) as u32, n(1000.0))?;
++        let subtitle = fit_text(
++            &library,
++            presentation.subtitle,
++            n(28.0) as u32,
++            n(1000.0),
++            theme,
++        )?;
+         let y = title_bottom + n(14.0) - subtitle.bounds[1];
+         subtitle.draw(
+             &mut canvas,
+             (f64::from(width * 2) - subtitle.advance) / 2.0,
+             y,
+-            100,
++            theme.ink(100),
+         );
+         title_bottom = y + subtitle.bounds[3];
+     }
+-    let watermark = fit_text(&library, presentation.footer, n(22.0) as u32, n(1000.0))?;
++    let watermark = fit_text(
++        &library,
++        presentation.footer,
++        n(22.0) as u32,
++        n(1000.0),
++        theme,
++    )?;
+     let watermark_y = (width * 2) as i32 - n(36.0) - watermark.bounds[3];
+     let watermark_top = watermark_y + watermark.bounds[1];
+     let center = f64::from(title_bottom + watermark_top) / (2.0 * scale);
+@@ -312,7 +358,7 @@ fn artwork(
+         &mut canvas,
+         f64::from(width * 2) - f64::from(n(36.0)) - watermark.advance.round(),
+         watermark_y,
+-        163,
++        theme.ink(163),
+     );
+     // Fit every contributor simultaneously. Choose the grid that leaves the
+     // largest uniform row scale; small lists retain the accepted single column.
+@@ -335,8 +381,8 @@ fn artwork(
+         }
+     }
+     let layout_rows = rows.len().max(1).div_ceil(columns);
+-    let name_font = font(&library, n(44.0 * text_scale).max(1) as u32)?;
+-    let count_font = font(&library, n(25.0 * text_scale).max(1) as u32)?;
++    let name_font = font(&library, n(44.0 * text_scale).max(1) as u32, theme, true)?;
++    let count_font = font(&library, n(25.0 * text_scale).max(1) as u32, theme, true)?;
+     let mut names = Vec::with_capacity(rows.len());
+     for (login, _) in rows {
+         let mut label = login.clone();
+@@ -374,7 +420,9 @@ fn artwork(
+     } else {
+         radius
+     };
+-    let shared_avatar = presentation.avatar.map(|image| sprite(image, radius, 0, 0));
++    let shared_avatar = presentation
++        .avatar
++        .map(|image| sprite(image, radius, 0, 0, background));
+     let client = if presentation.avatar.is_none() {
+         Some(
+             Client::builder()
+@@ -403,7 +451,7 @@ fn artwork(
+                                 login,
+                                 client.as_ref().context("avatar client unavailable")?,
+                             )?;
+-                            Ok(sprite(&image, radius, 0, 0))
++                            Ok(sprite(&image, radius, 0, 0, background))
+                         })
+                     })
+                     .collect();
+@@ -430,7 +478,7 @@ fn artwork(
+                 &mut canvas,
+                 f64::from(n(cell_x)),
+                 n(y - 43.0 * text_scale),
+-                0,
++                theme.ink(0),
+             );
+             let count_text = text(
+                 &count_font,
+@@ -449,11 +497,11 @@ fn artwork(
+                 f64::from(n(cell_x + 2.0 * text_scale)),
+                 n(y - 43.0 * text_scale) + name_bottom + n(12.0 * text_scale)
+                     - count_text.bounds[1],
+-                0,
++                theme.ink(0),
+             );
+             let mut ball = match ball {
+                 Ok(ball) => ball,
+-                Err(_) => sprite(&fallback_avatar(login, &library)?, radius, 0, 0),
++                Err(_) => sprite(&fallback_avatar(login, &library)?, radius, 0, 0, background),
+             };
+             ball.y = rounded(y * f64::from(width) / 1080.0);
+             ball.count = *count;
+@@ -475,13 +523,16 @@ fn artwork(
+             &mut canvas,
+             f64::from(n(70.0)),
+             n(340.0),
+-            0,
++            theme.ink(0),
+         );
+     }
+-    Ok((downsample_artwork(&canvas, width).into_raw(), sprites))
++    Ok((
++        downsample_artwork(&canvas, width, background).into_raw(),
++        sprites,
++    ))
+ }
+ 
+-fn downsample_artwork(canvas: &RgbImage, width: u32) -> RgbImage {
++fn downsample_artwork(canvas: &RgbImage, width: u32, background: [u8; 3]) -> RgbImage {
+     // At 2x downsampling Lanczos3 needs six source pixels of support.
+     // Even crop bounds preserve the full canvas's sampling coordinates.
+     let mut regions: Vec<(u32, u32, u32, u32)> = Vec::new();
+@@ -490,12 +541,12 @@ fn downsample_artwork(canvas: &RgbImage, width: u32) -> RgbImage {
+         .chunks_exact(canvas.width() as usize * 3)
+         .enumerate()
+     {
+-        let Some(left) = row.chunks_exact(3).position(|pixel| pixel != [255; 3]) else {
++        let Some(left) = row.chunks_exact(3).position(|pixel| pixel != background) else {
+             continue;
+         };
+         let right = row
+             .chunks_exact(3)
+-            .rposition(|pixel| pixel != [255; 3])
++            .rposition(|pixel| pixel != background)
+             .unwrap()
+             + 1;
+         let (left, right, y) = (left as u32, right as u32, y as u32);
+@@ -507,7 +558,7 @@ fn downsample_artwork(canvas: &RgbImage, width: u32) -> RgbImage {
+             regions.push((left, y, right, y + 1));
+         }
+     }
+-    let mut output = RgbImage::from_pixel(width, width, Rgb([255; 3]));
++    let mut output = RgbImage::from_pixel(width, width, Rgb(background));
+     for (left, top, right, bottom) in regions {
+         let left = left.saturating_sub(8) / 2 * 2;
+         let top = top.saturating_sub(8) / 2 * 2;
+@@ -610,7 +661,7 @@ struct YuvSprite {
+ }
+ 
+ impl YuvSprite {
+-    fn new(sprite: &Sprite) -> Self {
++    fn new(sprite: &Sprite, background: [u8; 3]) -> Self {
+         let diameter = sprite.diameter;
+         let variants = std::array::from_fn(|parity| {
+             let (px, py) = (parity & 1, parity >> 1);
+@@ -636,7 +687,7 @@ impl YuvSprite {
+                                 let start = (sy as usize * diameter + sx as usize) * 3;
+                                 &sprite.pixels[start..start + 3]
+                             } else {
+-                                &[255, 255, 255]
++                                &background
+                             };
+                             for channel in 0..3 {
+                                 sum[channel] += i32::from(rgb[channel]);
+@@ -771,6 +822,7 @@ pub fn render(
+             "merges"
+         },
+         avatar: None,
++        theme: Theme::Legacy,
+     };
+     render_with(rows, &presentation, output, formats, options)
+ }
+@@ -816,7 +868,10 @@ pub fn render_with(
+     }
+     let (background, sprites) = artwork(rows, presentation, options.width)?;
+     let yuv_sprites: Vec<_> = if yuv {
+-        sprites.iter().map(YuvSprite::new).collect()
++        sprites
++            .iter()
++            .map(|sprite| YuvSprite::new(sprite, presentation.theme.background()))
++            .collect()
+     } else {
+         Vec::new()
+     };
+@@ -991,10 +1046,16 @@ pub fn render_with(
+         .collect())
+ }
+ 
+-fn fit_text(library: &Library, value: &str, initial_size: u32, width: i32) -> Result<Text> {
++fn fit_text(
++    library: &Library,
++    value: &str,
++    initial_size: u32,
++    width: i32,
++    theme: Theme,
++) -> Result<Text> {
+     let mut size = initial_size.max(1);
+     loop {
+-        let shaped = text(&font(library, size)?, value)?;
++        let shaped = text(&font(library, size, theme, true)?, value)?;
+         if shaped.advance <= f64::from(width) || size == 1 {
+             return Ok(shaped);
+         }
+@@ -1018,6 +1079,119 @@ fn ball_x(left: i32, span: i32, count: u64, maximum: u64, frame: i32, fps: u32)
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn rgb_text_blends_each_channel_and_theme_fonts_are_portable() -> Result<()> {
++        let library = Library::init()?;
++        assert_eq!(
++            font(&library, 24, Theme::EBalls, false)?
++                .family_name()
++                .as_deref(),
++            Some("IBM Plex Sans")
++        );
++        assert_eq!(
++            font(&library, 24, Theme::EBalls, true)?
++                .family_name()
++                .as_deref(),
++            Some("IBM Plex Mono")
++        );
++        assert_eq!(Theme::Legacy.background(), [255; 3]);
++        assert_eq!(Theme::Legacy.ink(100), [100; 3]);
++        let shaped = Text {
++            glyphs: vec![Glyph {
++                x: 0,
++                top: 0,
++                width: 3,
++                height: 1,
++                mask: vec![0, 128, 255],
++            }],
++            advance: 3.0,
++            bounds: [0, 0, 3, 1],
++            ascender: 0,
++        };
++        let mut canvas = RgbImage::from_pixel(3, 1, Rgb(Theme::EBalls.background()));
++        shaped.draw(&mut canvas, 0.0, 0, Theme::EBalls.ink(0));
++        assert_eq!(canvas.get_pixel(0, 0).0, [245, 241, 232]);
++        assert_eq!(canvas.get_pixel(1, 0).0, [133, 174, 175]);
++        assert_eq!(canvas.get_pixel(2, 0).0, [21, 107, 118]);
++        Ok(())
++    }
++
++    #[test]
++    fn sparse_downsampling_matches_full_canvas_for_both_palettes() {
++        for theme in [Theme::Legacy, Theme::EBalls] {
++            let background = theme.background();
++            let mut canvas = RgbImage::from_pixel(128, 128, Rgb(background));
++            for (x, y) in [(0, 0), (31, 17), (32, 18), (90, 85), (127, 127)] {
++                canvas.put_pixel(x, y, Rgb(theme.ink(0)));
++            }
++            assert_eq!(
++                downsample_artwork(&canvas, 64, background),
++                imageops::resize(&canvas, 64, 64, FilterType::Lanczos3)
++            );
++        }
++    }
++
++    #[test]
++    fn sprite_edges_and_dirty_yuv_parities_match_full_frame_conversion() {
++        for theme in [Theme::Legacy, Theme::EBalls] {
++            let background = theme.background();
++            let ink = theme.ink(0);
++            let source = RgbImage::from_pixel(64, 64, Rgb(ink));
++            let ball = sprite(&source, 12, 0, 0, background);
++            assert_eq!(&ball.pixels[..3], &background);
++            assert_eq!(
++                &ball.pixels[(12 * 24 + 12) * 3..(12 * 24 + 12) * 3 + 3],
++                &ink
++            );
++            assert!(ball
++                .pixels
++                .chunks_exact(3)
++                .any(|p| p != background && p != ink));
++            for p in ball.pixels.chunks_exact(3) {
++                for c in 0..3 {
++                    assert!((ink[c]..=background[c]).contains(&p[c]));
++                }
++            }
++            let width = 64;
++            let rgb = RgbImage::from_pixel(width as u32, width as u32, Rgb(background)).into_raw();
++            let yuv = yuv_background(&rgb, width);
++            let patch = YuvSprite::new(&ball, background);
++            let mut dirty_rgb = rgb.clone();
++            let mut dirty_yuv = yuv.clone();
++            let mut previous = None;
++            // Cross every chroma parity, overlapping and disjoint dirty rectangles.
++            for (x, y) in [(0, 0), (1, 0), (0, 1), (1, 1), (39, 39), (40, 40)] {
++                if let Some((px, py)) = previous {
++                    copy_rectangle(&mut dirty_rgb, &rgb, width, px, py, ball.diameter, false);
++                    yuv_rectangle(&mut dirty_yuv, &yuv, width, px, py, ball.diameter, None);
++                }
++                copy_rectangle(
++                    &mut dirty_rgb,
++                    &ball.pixels,
++                    width,
++                    x,
++                    y,
++                    ball.diameter,
++                    true,
++                );
++                yuv_rectangle(
++                    &mut dirty_yuv,
++                    &yuv,
++                    width,
++                    x,
++                    y,
++                    ball.diameter,
++                    Some(&patch),
++                );
++                let mut full = rgb.clone();
++                copy_rectangle(&mut full, &ball.pixels, width, x, y, ball.diameter, true);
++                assert_eq!(dirty_rgb, full);
++                assert_eq!(dirty_yuv, yuv_background(&full, width), "parity at {x},{y}");
++                previous = Some((x, y));
++            }
++        }
++    }
++
+     #[test]
+     fn speeds_are_linear_and_zero_stays_still() {
+         assert_eq!(ball_x(100, 600, 10, 10, 30, 60), 400);
+@@ -1037,6 +1211,7 @@ mod tests {
+             singular: "e",
+             plural: "e's",
+             avatar: Some(&image),
++            theme: Theme::EBalls,
+         };
+         let rows: Vec<_> = [5773, 5691, 3809, 3292, 109, 4, 734]
+             .into_iter()
+diff --git a/tests/test_count_letters.py b/tests/test_count_letters.py
+index 86e343d..2c7a745 100644
+--- a/tests/test_count_letters.py
++++ b/tests/test_count_letters.py
+@@ -148,6 +148,45 @@ class CounterTests(unittest.TestCase):
+         self.assertEqual(proc.returncode, 0, proc.stderr)
+         self.assertEqual(json.loads(output.read_text())["source"]["total_count"], 2)
+ 
++    def run_since(self, *args):
++        output = Path(self.tmp.name) / "since.json"
++        proc = subprocess.run([
++            "python3", str(ROOT / "scripts/count_letters.py"), "--repo", str(self.repo),
++            "--ref", "main", "--repository", "example/project", "--out", str(output),
++            "--since", "7d", *args,
++        ], capture_output=True, text=True)
++        return proc, output
++
++    def test_since_pinned_end_matches_explicit_week(self):
++        a = self.commit(b"e", "2026-10-04T00:00:00+00:00")
++        b = self.commit(b"ee", "2026-10-10T23:59:59+00:00", (a,))
++        self.commit(b"eee", "2026-10-11T00:00:00+00:00", (b,))
++        proc, output = self.run_since("--end", END.isoformat())
++        self.assertEqual(proc.returncode, 0, proc.stderr)
++        self.assertEqual(json.loads(output.read_text()), self.collect())
++
++    def test_since_defaults_to_seven_completed_utc_days(self):
++        self.commit(b"e")
++        before = dt.datetime.now(dt.timezone.utc).date()
++        proc, output = self.run_since()
++        after = dt.datetime.now(dt.timezone.utc).date()
++        self.assertEqual(proc.returncode, 0, proc.stderr)
++        data = json.loads(output.read_text())
++        end = dt.date.fromisoformat(data["source"]["end_exclusive"][:10])
++        self.assertIn(end, [before, after])
++        self.assertEqual(data["source"]["start_inclusive"],
++                         (end - dt.timedelta(days=7)).isoformat() + "T00:00:00Z")
++        self.assertEqual(len(data["rows"]), 7)
++
++    def test_since_rejects_explicit_conflicts_and_unsupported_values(self):
++        self.commit(b"e")
++        for args in [("--days", "7"), ("--days", "2"),
++                     ("--start", START.isoformat()), ("--since", "8d")]:
++            with self.subTest(args=args):
++                proc, output = self.run_since(*args)
++                self.assertEqual(proc.returncode, 2, proc.stderr)
++                self.assertFalse(output.exists())
++
+     def test_independent_verifier_reconciles_raw_objects(self):
+         a = self.commit(b"eE\n\nbody e")
+         self.commit(b"e", parents=(a,))
+diff --git a/tests/test_render_cli.py b/tests/test_render_cli.py
+index 27a2391..3cb3fb2 100644
+--- a/tests/test_render_cli.py
++++ b/tests/test_render_cli.py
+@@ -55,6 +55,22 @@ class RenderCliTests(unittest.TestCase):
+             self.assertEqual(meta["streams"][0]["height"], width)
+             self.assertAlmostEqual(float(meta["format"]["duration"]), 0.4, delta=0.1)
+             subprocess.run(["ffmpeg", "-v", "error", "-xerror", "-i", str(file), "-f", "null", "-"], check=True)
++            frame = subprocess.check_output([
++                "ffmpeg", "-v", "error", "-i", str(file), "-frames:v", "1",
++                "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
++            ])
++            self.assertEqual(len(frame), width * width * 3)
++            # Lossy H.264/YUV and GIF palettes need a small color tolerance.
++            for actual, expected in zip(frame[:3], [245, 241, 232]):
++                self.assertLessEqual(abs(actual - expected), 4)
++            # Restrict ink checks to the title, excluding the blue portrait.
++            # At 320px YUV420 averages thin glyphs with cream; GIF keeps RGB.
++            title = frame[:width * (width // 5) * 3]
++            pixels = zip(title[0::3], title[1::3], title[2::3])
++            tolerance = 40 if suffix == "mp4" else 12
++            self.assertGreater(sum(all(abs(c - e) <= tolerance for c, e in zip(p, [21, 107, 118]))
++                                   for p in pixels), 10, suffix)
++
+ 
+     def test_all_zeroes_still_render(self):
+         for row in self.value["rows"]:
+diff --git a/assets/plex-manifest.json b/assets/plex-manifest.json
+new file mode 100644
+index 0000000..e0bc065
+--- /dev/null
++++ b/assets/plex-manifest.json
+@@ -0,0 +1,27 @@
++{
++  "repository": "https://github.com/IBM/plex",
++  "revision": "763c36ef9117782905ae010056dfbe8fd2653a25",
++  "license": "OFL-1.1",
++  "files": [
++    {
++      "path": "IBMPlexSans-Regular.ttf",
++      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf",
++      "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5"
++    },
++    {
++      "path": "IBMPlexSans-LICENSE.txt",
++      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/LICENSE.txt",
++      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
++    },
++    {
++      "path": "IBMPlexMono-Regular.ttf",
++      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf",
++      "sha256": "7c6fbddca4b700be918f5f6183d9bd4464fa427fe435f0b480d77fe2bb8c5a43"
++    },
++    {
++      "path": "IBMPlexMono-LICENSE.txt",
++      "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/LICENSE.txt",
++      "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da"
++    }
++  ]
++}
+diff --git a/assets/IBMPlexSans-LICENSE.txt b/assets/IBMPlexSans-LICENSE.txt
+new file mode 100644
+index 0000000..c35c4c6
+--- /dev/null
++++ b/assets/IBMPlexSans-LICENSE.txt
+@@ -0,0 +1,93 @@
++Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
++
++This Font Software is licensed under the SIL Open Font License, Version 1.1.
++
++This license is copied below, and is also available with a FAQ at: http://scripts.sil.org/OFL
++
++
++-----------------------------------------------------------
++SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
++-----------------------------------------------------------
++
++PREAMBLE
++The goals of the Open Font License (OFL) are to stimulate worldwide
++development of collaborative font projects, to support the font creation
++efforts of academic and linguistic communities, and to provide a free and
++open framework in which fonts may be shared and improved in partnership
++with others.
++
++The OFL allows the licensed fonts to be used, studied, modified and
++redistributed freely as long as they are not sold by themselves. The
++fonts, including any derivative works, can be bundled, embedded, 
++redistributed and/or sold with any software provided that any reserved
++names are not used by derivative works. The fonts and derivatives,
++however, cannot be released under any other type of license. The
++requirement for fonts to remain under this license does not apply
++to any document created using the fonts or their derivatives.
++
++DEFINITIONS
++"Font Software" refers to the set of files released by the Copyright
++Holder(s) under this license and clearly marked as such. This may
++include source files, build scripts and documentation.
++
++"Reserved Font Name" refers to any names specified as such after the
++copyright statement(s).
++
++"Original Version" refers to the collection of Font Software components as
++distributed by the Copyright Holder(s).
++
++"Modified Version" refers to any derivative made by adding to, deleting,
++or substituting -- in part or in whole -- any of the components of the
++Original Version, by changing formats or by porting the Font Software to a
++new environment.
++
++"Author" refers to any designer, engineer, programmer, technical
++writer or other person who contributed to the Font Software.
++
++PERMISSION & CONDITIONS
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of the Font Software, to use, study, copy, merge, embed, modify,
++redistribute, and sell modified and unmodified copies of the Font
++Software, subject to the following conditions:
++
++1) Neither the Font Software nor any of its individual components,
++in Original or Modified Versions, may be sold by itself.
++
++2) Original or Modified Versions of the Font Software may be bundled,
++redistributed and/or sold with any software, provided that each copy
++contains the above copyright notice and this license. These can be
++included either as stand-alone text files, human-readable headers or
++in the appropriate machine-readable metadata fields within text or
++binary files as long as those fields can be easily viewed by the user.
++
++3) No Modified Version of the Font Software may use the Reserved Font
++Name(s) unless explicit written permission is granted by the corresponding
++Copyright Holder. This restriction only applies to the primary font name as
++presented to the users.
++
++4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
++Software shall not be used to promote, endorse or advertise any
++Modified Version, except to acknowledge the contribution(s) of the
++Copyright Holder(s) and the Author(s) or with their explicit written
++permission.
++
++5) The Font Software, modified or unmodified, in part or in whole,
++must be distributed entirely under this license, and must not be
++distributed under any other license. The requirement for fonts to
++remain under this license does not apply to any document created
++using the Font Software.
++
++TERMINATION
++This license becomes null and void if any of the above conditions are
++not met.
++
++DISCLAIMER
++THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
++OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
++COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
++DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
++OTHER DEALINGS IN THE FONT SOFTWARE.
+diff --git a/assets/IBMPlexMono-LICENSE.txt b/assets/IBMPlexMono-LICENSE.txt
+new file mode 100644
+index 0000000..c35c4c6
+--- /dev/null
++++ b/assets/IBMPlexMono-LICENSE.txt
+@@ -0,0 +1,93 @@
++Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
++
++This Font Software is licensed under the SIL Open Font License, Version 1.1.
++
++This license is copied below, and is also available with a FAQ at: http://scripts.sil.org/OFL
++
++
++-----------------------------------------------------------
++SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
++-----------------------------------------------------------
++
++PREAMBLE
++The goals of the Open Font License (OFL) are to stimulate worldwide
++development of collaborative font projects, to support the font creation
++efforts of academic and linguistic communities, and to provide a free and
++open framework in which fonts may be shared and improved in partnership
++with others.
++
++The OFL allows the licensed fonts to be used, studied, modified and
++redistributed freely as long as they are not sold by themselves. The
++fonts, including any derivative works, can be bundled, embedded, 
++redistributed and/or sold with any software provided that any reserved
++names are not used by derivative works. The fonts and derivatives,
++however, cannot be released under any other type of license. The
++requirement for fonts to remain under this license does not apply
++to any document created using the fonts or their derivatives.
++
++DEFINITIONS
++"Font Software" refers to the set of files released by the Copyright
++Holder(s) under this license and clearly marked as such. This may
++include source files, build scripts and documentation.
++
++"Reserved Font Name" refers to any names specified as such after the
++copyright statement(s).
++
++"Original Version" refers to the collection of Font Software components as
++distributed by the Copyright Holder(s).
++
++"Modified Version" refers to any derivative made by adding to, deleting,
++or substituting -- in part or in whole -- any of the components of the
++Original Version, by changing formats or by porting the Font Software to a
++new environment.
++
++"Author" refers to any designer, engineer, programmer, technical
++writer or other person who contributed to the Font Software.
++
++PERMISSION & CONDITIONS
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of the Font Software, to use, study, copy, merge, embed, modify,
++redistribute, and sell modified and unmodified copies of the Font
++Software, subject to the following conditions:
++
++1) Neither the Font Software nor any of its individual components,
++in Original or Modified Versions, may be sold by itself.
++
++2) Original or Modified Versions of the Font Software may be bundled,
++redistributed and/or sold with any software, provided that each copy
++contains the above copyright notice and this license. These can be
++included either as stand-alone text files, human-readable headers or
++in the appropriate machine-readable metadata fields within text or
++binary files as long as those fields can be easily viewed by the user.
++
++3) No Modified Version of the Font Software may use the Reserved Font
++Name(s) unless explicit written permission is granted by the corresponding
++Copyright Holder. This restriction only applies to the primary font name as
++presented to the users.
++
++4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
++Software shall not be used to promote, endorse or advertise any
++Modified Version, except to acknowledge the contribution(s) of the
++Copyright Holder(s) and the Author(s) or with their explicit written
++permission.
++
++5) The Font Software, modified or unmodified, in part or in whole,
++must be distributed entirely under this license, and must not be
++distributed under any other license. The requirement for fonts to
++remain under this license does not apply to any document created
++using the Font Software.
++
++TERMINATION
++This license becomes null and void if any of the above conditions are
++not met.
++
++DISCLAIMER
++THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
++OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
++COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
++DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
++OTHER DEALINGS IN THE FONT SOFTWARE.

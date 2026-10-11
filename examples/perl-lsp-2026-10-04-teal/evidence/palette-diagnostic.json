@@ -1,0 +1,15 @@
+{
+  "method": "Rendered unchanged 320px synthetic CLI fixture; decoded first frames to RGB24 and inspected nearest title colors.",
+  "observed_exit_code": 0,
+  "nearest_mp4_title_rgb": [
+    40,
+    108,
+    104
+  ],
+  "nearest_gif_title_rgb": [
+    21,
+    107,
+    118
+  ],
+  "resolution": "MP4 thin strokes at 320px undergo YUV420 chroma averaging. Use 40-channel tolerance there and 12 for GIF; restrict assertion to title. Exact input RGB blending remains Rust-tested."
+}

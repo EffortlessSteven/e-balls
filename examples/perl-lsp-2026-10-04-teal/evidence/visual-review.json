@@ -1,0 +1,18 @@
+{
+  "method": "view_image on decoded MP4 preview and both contact sheets",
+  "sample_seconds": [
+    0,
+    0.5,
+    1,
+    3.5,
+    8,
+    15.9
+  ],
+  "observations": [
+    "Seven chronological rows with expected counts and source footer remain readable.",
+    "Teal title, dates, counts and footer on cream.",
+    "Same preserved portrait on all balls; fastest crosses at one second, small counts barely move.",
+    "No visible white rectangular trails or chroma stripes in sampled frames."
+  ],
+  "limitation": "Visual inspection is sampled; both complete streams were separately decoded and YUV parity is covered by exact Rust regressions."
+}

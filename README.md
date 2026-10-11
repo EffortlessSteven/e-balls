@@ -2,116 +2,118 @@
 
 # e-balls
 
-Occurrences of `E` in [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp)
-(and [perl-lsp-swarm](https://github.com/EffortlessMetrics/perl-lsp-swarm)) commit messages in the past week.
+A tool that turns a week of [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp) commit messages into a short race between days. Each day is a ball with Steven's avatar; the more occurrences of `e` it has, the faster it goes. You get a GIF, an MP4, and the counts as JSON.
 
-![Occurrences of E in perl-lsp commit messages in the past week](examples/perl-lsp-2026-10-04/e-balls.gif)
+![Top 7 perl-lsp days in the past week](examples/perl-lsp-2026-10-04-teal/e-balls.gif)
 
 *Top 7 perl-lsp days in the past week, rendered with `since: 7d`.*
 
-October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04/e-balls.mp4).
+October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04-teal/e-balls.mp4).
 
 ## Quick start
 
-Requires Rust 1.88+, Python 3.10+, Git, FFmpeg, and FreeType headers
-(`libfreetype6-dev` and `pkg-config` on Ubuntu).
+Build the Rust binary and render the example:
+
+```sh
+cargo build --release --locked --bins
+./target/release/e-balls \
+  --data examples/perl-lsp-2026-10-04-teal/data.json \
+  --avatar examples/perl-lsp-2026-10-04-teal/avatar.png
+```
+
+Files go to `out/`.
+
+## Render without publishing
+
+To get the files as a workflow artifact instead, run [CI](https://github.com/EffortlessSteven/e-balls/actions/workflows/ci.yml) on demand. The workflow:
+
+1. Counts the `e`s committed each day in the example week.
+2. Renders the GIF and MP4.
+3. Uploads the media and counts as the `e-balls-perl-lsp-workflow_dispatch` artifact.
+
+## Rank a time window
+
+Set `--since 7d` to count the `e`s committed in the past week. The title reads "Occurrences of 'e' in perl-lsp commit messages".
+
+```sh
+python3 scripts/count_letters.py \
+  --repo ../perl-lsp-history.git --ref main \
+  --repository EffortlessMetrics/perl-lsp-swarm \
+  --since 7d --out data.json
+```
+
+The window covers seven completed UTC days. Set `--end 2026-10-11` to reproduce the example week.
+
+## Inputs
+
+For `scripts/count_letters.py`:
+
+| Input | Default | What it does |
+| --- | --- | --- |
+| `--repo` | required | Local Git checkout or bare repository to read. |
+| `--repository` | required | Source `owner/repo`, shown in the footer. |
+| `--ref` | `HEAD` | Branch or commit to read. |
+| `--since` | unset | `7d` selects the past week. |
+| `--letter` | `e` | Letter to count. |
+| `--end` | today | Exclusive UTC end date. |
+| `--out` | required | Output JSON file. |
+
+For `e-balls`:
+
+| Input | Default | What it does |
+| --- | --- | --- |
+| `--data` | required | JSON with the daily counts. |
+| `--avatar` | required | Local portrait to use for every day. |
+| `--format` | `both` | `gif`, `mp4`, or `both`. |
+| `--out` | `out` | New output directory. |
+
+## Outputs
+
+All outputs are paths in the output directory.
+
+| Output | Contents |
+| --- | --- |
+| `e-balls.gif` | Animated GIF. |
+| `e-balls.mp4` | MP4 video. |
+| `manifest.json` | Daily counts and generated file paths. |
+| `data.json` | A snapshot of the commit messages' letter counts. |
+| `avatar.png` | The portrait used for each ball. |
+
+To use the files in another job, upload the output directory as an artifact.
+
+## What gets counted
+
+- Only `e` and `E` in commit messages count.
+- A commit present in several merged branches counts once.
+- All authors are included.
+- The seven days are shown in calendar order, using UTC committer dates. Empty days stay still.
+- The fastest ball crosses in one second, so speeds are relative within a clip. Clips last 16 seconds. MP4 is 1080px at 60fps, GIF is 480px at 15fps.
+
+## Run it locally
+
+Needs Rust 1.88+, Python 3.10+, Git, FFmpeg, and FreeType headers (`libfreetype6-dev` and `pkg-config` on Ubuntu).
 
 ```sh
 cargo build --release --locked --bins
 
-# Use an existing full checkout, or fetch commit history without file blobs.
 git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
   https://github.com/EffortlessMetrics/perl-lsp-swarm.git ../perl-lsp-history.git
 
 python3 scripts/count_letters.py \
-  --repo ../perl-lsp-history.git \
-  --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
-  --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
-  --start 2026-10-04 --end 2026-10-11 --out e-counts.json
+  --repo ../perl-lsp-history.git --ref main \
+  --repository EffortlessMetrics/perl-lsp-swarm \
+  --since 7d --out data.json
 
-# Independently recount the frozen snapshot from individual Git objects.
-python3 scripts/verify_counts.py --repo ../perl-lsp-history.git --data e-counts.json
-
-curl --fail --location 'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
-  --output steven.png
-
-./target/release/e-balls --data e-counts.json --avatar steven.png --out out
+./target/release/e-balls --data data.json \
+  --avatar examples/perl-lsp-2026-10-04-teal/avatar.png --format both
 ```
 
-`out/e-balls.mp4` is 1080×1080 at 60 fps. `out/e-balls.gif` is 480×480 at
-15 fps. Both run for 16 seconds by default. The output also includes the exact
-input JSON, the portrait used, and a render manifest. Existing output
-directories are refused; use a new `--out` path for another render.
+Files go to `out/`. Useful flags: `--days`, `--start`, and `--end` for other windows; `--width`, `--fps`, and `--duration` for rendering. Run `--help` for the rest.
 
-Rendering is offline. It does not look up avatars from row labels. An unreadable
-portrait is an error, not permission to replace your head with initials.
+## More
 
-To measure the last seven **completed UTC days**, replace the pinned `--ref`
-with the source's current branch and omit `--start` and `--end`. The collector
-records the resolved commit SHA before reading. `--days`, `--end`, and
-`--letter` select other windows or ASCII letters.
+The `release-balls` CLI and action remain available for release races; see [release publishing details](docs/releases.md).
 
-## What gets counted
+## License
 
-We count ASCII `e` and `E` in the **full raw commit message**, including the
-subject, body, and trailers. Commit headers, diffs, code, PR comments, and
-unmerged branch tips do not count. Accented letters are not folded into `e`.
-
-Dates are UTC **committer** dates, not author dates or inferred merge times.
-The start is inclusive and the end is exclusive: the example above covers
-October 4–10, 2026. Empty days remain as zero rows. Shallow histories fail
-rather than quietly producing incomplete figures.
-
-All commits reachable from the pinned ref count once by SHA, including merge
-commits and merged branch ancestry. This is not a first-parent view and not a
-PR count. The collector walks the entire ancestry before filtering dates so
-out-of-order commit timestamps cannot truncate the result.
-
-The source is `EffortlessMetrics/perl-lsp-swarm`, the development repository
-for perl-lsp. The source repository is shown in the footer; the JSON records
-the ref, full SHA, window, counting rules, per-commit counts, and message
-SHA-256 digests. All authors are included. Repeating Steven's portrait does
-not turn this into an authorship claim.
-
-Rows remain in input order. Speed is linear relative to the largest count;
-the fastest ball crosses the arena in one second. A zero stays still. A small
-count really does barely move. There is no minimum speed or log scale.
-
-## Other ridiculous metrics
-
-Supply your own ordered JSON rather than inventing PR records:
-
-```json
-{
-  "schema_version": 1,
-  "title": "Synthetic example, not repository data",
-  "subtitle": "Any ordered labels and nonnegative integer counts",
-  "footer": "Your actual source",
-  "unit": "e's",
-  "unit_singular": "e",
-  "rows": [
-    {"label": "Monday", "count": 12},
-    {"label": "Tuesday", "count": 3},
-    {"label": "Wednesday", "count": 0}
-  ]
-}
-```
-
-Extra fields such as source receipts are preserved in the output snapshot.
-Labels, titles, units, and the portrait are independent. `--format mp4|gif|both`,
-`--duration`, `--width`, and `--fps` control export; GIF delivery stays 480px/15fps.
-Run `./target/release/e-balls --help` for all options.
-
-## Checks and attribution
-
-The fork's CI runs Git fixture tests, Rust tests, actual CLI/FFmpeg tests, and
-a pinned perl-lsp render. Media and verification receipts are uploaded as
-artifacts, not posted or attached to a release. No perl-lsp workflow is changed.
-All work and PRs belong in **EffortlessSteven/e-balls**, not Maria's repository.
-
-The original `release-balls` CLI and `action.yml` remain available for PR/release
-races; their documentation is in [docs/releases.md](docs/releases.md). The new
-letter-counter path uses `e-balls`, not that legacy action.
-
-MIT. Maria's copyright and license are retained in [LICENSE](LICENSE).
-Bundled asset notices remain in [assets/README.md](assets/README.md).
+[MIT](LICENSE). The bundled fonts are CC0 and SIL OFL 1.1; see [assets](assets/README.md).

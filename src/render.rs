@@ -20,6 +20,29 @@ pub struct Options {
     pub strategy: String,
 }
 
+/// The legacy CLI keeps its original palette and platform font selection.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Theme {
+    Legacy,
+    EBalls,
+}
+
+impl Theme {
+    pub fn background(self) -> [u8; 3] {
+        match self {
+            Self::Legacy => [255; 3],
+            Self::EBalls => [245, 241, 232],
+        }
+    }
+
+    fn ink(self, legacy: u8) -> [u8; 3] {
+        match self {
+            Self::Legacy => [legacy; 3],
+            Self::EBalls => [21, 107, 118],
+        }
+    }
+}
+
 /// Labels are independent of avatar identity. A supplied image is reused for
 /// every row; no avatar requests or fallback initials are used in that mode.
 pub struct Presentation<'a> {
@@ -29,6 +52,7 @@ pub struct Presentation<'a> {
     pub singular: &'a str,
     pub plural: &'a str,
     pub avatar: Option<&'a RgbImage>,
+    pub theme: Theme,
 }
 
 struct Glyph {
@@ -55,9 +79,16 @@ fn rounded(value: f64) -> i32 {
     value.round_ties_even() as i32
 }
 
-fn font(library: &Library, size: u32) -> Result<Face> {
+fn font(library: &Library, size: u32, theme: Theme, mono: bool) -> Result<Face> {
     let mac_font = Path::new("/System/Library/Fonts/HelveticaNeue.ttc");
-    let face = if mac_font.exists() {
+    let face = if theme == Theme::EBalls {
+        let bytes: &[u8] = if mono {
+            include_bytes!("../assets/IBMPlexMono-Regular.ttf")
+        } else {
+            include_bytes!("../assets/IBMPlexSans-Regular.ttf")
+        };
+        library.new_memory_face(bytes.to_vec(), 0)?
+    } else if mac_font.exists() {
         library.new_face(mac_font, 0)?
     } else {
         library.new_memory_face(include_bytes!("../assets/Aileron-Regular.ttf").to_vec(), 0)?
@@ -129,7 +160,7 @@ fn text(face: &Face, value: &str) -> Result<Text> {
 }
 
 impl Text {
-    fn draw(&self, canvas: &mut RgbImage, x: f64, y: i32, color: u8) {
+    fn draw(&self, canvas: &mut RgbImage, x: f64, y: i32, color: [u8; 3]) {
         let x = x.round() as i32;
         for glyph in &self.glyphs {
             let top = y + self.ascender - glyph.top;
@@ -146,9 +177,9 @@ impl Text {
                     let alpha = u32::from(glyph.mask[row * glyph.width + column]);
                     if alpha != 0 {
                         let target = canvas.get_pixel_mut(target_x as u32, target_y as u32);
-                        for channel in &mut target.0 {
+                        for (channel, ink) in target.0.iter_mut().zip(color) {
                             *channel = ((u32::from(*channel) * (255 - alpha)
-                                + u32::from(color) * alpha
+                                + u32::from(ink) * alpha
                                 + 127)
                                 / 255) as u8;
                         }
@@ -202,7 +233,7 @@ fn avatar(login: &str, client: &Client) -> Result<RgbImage> {
 fn fallback_avatar(login: &str, library: &Library) -> Result<RgbImage> {
     let mut image = RgbImage::from_pixel(128, 128, Rgb([228, 228, 231]));
     let initials: String = login.chars().take(2).flat_map(char::to_uppercase).collect();
-    text(&font(library, 36)?, &initials)?.draw(&mut image, 28.0, 42, 0);
+    text(&font(library, 36, Theme::Legacy, false)?, &initials)?.draw(&mut image, 28.0, 42, [0; 3]);
     Ok(image)
 }
 
@@ -217,7 +248,7 @@ struct Sprite {
     span: i32,
 }
 
-fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64) -> Sprite {
+fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64, background: [u8; 3]) -> Sprite {
     let diameter = (radius * 2) as u32;
     let side = source.width().min(source.height());
     let crop = imageops::crop_imm(
@@ -238,11 +269,12 @@ fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64) -> Sprite {
         Luma([if inside { 255 } else { 0 }])
     });
     let mask = imageops::resize(&mask, diameter, diameter, FilterType::Lanczos3);
-    // The accepted layout keeps the entire arena white, so flatten once.
+    // Flatten antialiased circular edges onto the selected arena once.
     for (pixel, alpha) in ball.pixels_mut().zip(mask.pixels()) {
         let alpha = u32::from(alpha[0]);
-        for channel in &mut pixel.0 {
-            *channel = ((u32::from(*channel) * alpha + 255 * (255 - alpha) + 127) / 255) as u8;
+        for (channel, base) in pixel.0.iter_mut().zip(background) {
+            *channel =
+                ((u32::from(*channel) * alpha + u32::from(base) * (255 - alpha) + 127) / 255) as u8;
         }
     }
     Sprite {
@@ -274,13 +306,15 @@ fn artwork(
     width: u32,
 ) -> Result<(Vec<u8>, Vec<Sprite>)> {
     let library = Library::init()?;
+    let theme = presentation.theme;
+    let background = theme.background();
     let scale = f64::from(width) * 2.0 / 1080.0;
     let n = |value: f64| rounded(value * scale);
-    let mut canvas = RgbImage::from_pixel(width * 2, width * 2, Rgb([255; 3]));
+    let mut canvas = RgbImage::from_pixel(width * 2, width * 2, Rgb(background));
     let title = presentation.title;
     let mut title_size = n(48.0) as u32;
     let title = loop {
-        let shaped = text(&font(&library, title_size)?, title)?;
+        let shaped = text(&font(&library, title_size, theme, false)?, title)?;
         if shaped.advance <= f64::from(n(1000.0)) || title_size <= 1 {
             break shaped;
         }
@@ -290,21 +324,33 @@ fn artwork(
         &mut canvas,
         (f64::from(width * 2) - f64::from(title.bounds[2] - title.bounds[0])) / 2.0,
         n(80.0),
-        0,
+        theme.ink(0),
     );
     let mut title_bottom = n(80.0) + title.bounds[3];
     if !presentation.subtitle.is_empty() {
-        let subtitle = fit_text(&library, presentation.subtitle, n(28.0) as u32, n(1000.0))?;
+        let subtitle = fit_text(
+            &library,
+            presentation.subtitle,
+            n(28.0) as u32,
+            n(1000.0),
+            theme,
+        )?;
         let y = title_bottom + n(14.0) - subtitle.bounds[1];
         subtitle.draw(
             &mut canvas,
             (f64::from(width * 2) - subtitle.advance) / 2.0,
             y,
-            100,
+            theme.ink(100),
         );
         title_bottom = y + subtitle.bounds[3];
     }
-    let watermark = fit_text(&library, presentation.footer, n(22.0) as u32, n(1000.0))?;
+    let watermark = fit_text(
+        &library,
+        presentation.footer,
+        n(22.0) as u32,
+        n(1000.0),
+        theme,
+    )?;
     let watermark_y = (width * 2) as i32 - n(36.0) - watermark.bounds[3];
     let watermark_top = watermark_y + watermark.bounds[1];
     let center = f64::from(title_bottom + watermark_top) / (2.0 * scale);
@@ -312,7 +358,7 @@ fn artwork(
         &mut canvas,
         f64::from(width * 2) - f64::from(n(36.0)) - watermark.advance.round(),
         watermark_y,
-        163,
+        theme.ink(163),
     );
     // Fit every contributor simultaneously. Choose the grid that leaves the
     // largest uniform row scale; small lists retain the accepted single column.
@@ -335,8 +381,8 @@ fn artwork(
         }
     }
     let layout_rows = rows.len().max(1).div_ceil(columns);
-    let name_font = font(&library, n(44.0 * text_scale).max(1) as u32)?;
-    let count_font = font(&library, n(25.0 * text_scale).max(1) as u32)?;
+    let name_font = font(&library, n(44.0 * text_scale).max(1) as u32, theme, true)?;
+    let count_font = font(&library, n(25.0 * text_scale).max(1) as u32, theme, true)?;
     let mut names = Vec::with_capacity(rows.len());
     for (login, _) in rows {
         let mut label = login.clone();
@@ -374,7 +420,9 @@ fn artwork(
     } else {
         radius
     };
-    let shared_avatar = presentation.avatar.map(|image| sprite(image, radius, 0, 0));
+    let shared_avatar = presentation
+        .avatar
+        .map(|image| sprite(image, radius, 0, 0, background));
     let client = if presentation.avatar.is_none() {
         Some(
             Client::builder()
@@ -403,7 +451,7 @@ fn artwork(
                                 login,
                                 client.as_ref().context("avatar client unavailable")?,
                             )?;
-                            Ok(sprite(&image, radius, 0, 0))
+                            Ok(sprite(&image, radius, 0, 0, background))
                         })
                     })
                     .collect();
@@ -430,7 +478,7 @@ fn artwork(
                 &mut canvas,
                 f64::from(n(cell_x)),
                 n(y - 43.0 * text_scale),
-                0,
+                theme.ink(0),
             );
             let count_text = text(
                 &count_font,
@@ -449,11 +497,11 @@ fn artwork(
                 f64::from(n(cell_x + 2.0 * text_scale)),
                 n(y - 43.0 * text_scale) + name_bottom + n(12.0 * text_scale)
                     - count_text.bounds[1],
-                0,
+                theme.ink(0),
             );
             let mut ball = match ball {
                 Ok(ball) => ball,
-                Err(_) => sprite(&fallback_avatar(login, &library)?, radius, 0, 0),
+                Err(_) => sprite(&fallback_avatar(login, &library)?, radius, 0, 0, background),
             };
             ball.y = rounded(y * f64::from(width) / 1080.0);
             ball.count = *count;
@@ -475,13 +523,16 @@ fn artwork(
             &mut canvas,
             f64::from(n(70.0)),
             n(340.0),
-            0,
+            theme.ink(0),
         );
     }
-    Ok((downsample_artwork(&canvas, width).into_raw(), sprites))
+    Ok((
+        downsample_artwork(&canvas, width, background).into_raw(),
+        sprites,
+    ))
 }
 
-fn downsample_artwork(canvas: &RgbImage, width: u32) -> RgbImage {
+fn downsample_artwork(canvas: &RgbImage, width: u32, background: [u8; 3]) -> RgbImage {
     // At 2x downsampling Lanczos3 needs six source pixels of support.
     // Even crop bounds preserve the full canvas's sampling coordinates.
     let mut regions: Vec<(u32, u32, u32, u32)> = Vec::new();
@@ -490,12 +541,12 @@ fn downsample_artwork(canvas: &RgbImage, width: u32) -> RgbImage {
         .chunks_exact(canvas.width() as usize * 3)
         .enumerate()
     {
-        let Some(left) = row.chunks_exact(3).position(|pixel| pixel != [255; 3]) else {
+        let Some(left) = row.chunks_exact(3).position(|pixel| pixel != background) else {
             continue;
         };
         let right = row
             .chunks_exact(3)
-            .rposition(|pixel| pixel != [255; 3])
+            .rposition(|pixel| pixel != background)
             .unwrap()
             + 1;
         let (left, right, y) = (left as u32, right as u32, y as u32);
@@ -507,7 +558,7 @@ fn downsample_artwork(canvas: &RgbImage, width: u32) -> RgbImage {
             regions.push((left, y, right, y + 1));
         }
     }
-    let mut output = RgbImage::from_pixel(width, width, Rgb([255; 3]));
+    let mut output = RgbImage::from_pixel(width, width, Rgb(background));
     for (left, top, right, bottom) in regions {
         let left = left.saturating_sub(8) / 2 * 2;
         let top = top.saturating_sub(8) / 2 * 2;
@@ -610,7 +661,7 @@ struct YuvSprite {
 }
 
 impl YuvSprite {
-    fn new(sprite: &Sprite) -> Self {
+    fn new(sprite: &Sprite, background: [u8; 3]) -> Self {
         let diameter = sprite.diameter;
         let variants = std::array::from_fn(|parity| {
             let (px, py) = (parity & 1, parity >> 1);
@@ -636,7 +687,7 @@ impl YuvSprite {
                                 let start = (sy as usize * diameter + sx as usize) * 3;
                                 &sprite.pixels[start..start + 3]
                             } else {
-                                &[255, 255, 255]
+                                &background
                             };
                             for channel in 0..3 {
                                 sum[channel] += i32::from(rgb[channel]);
@@ -771,6 +822,7 @@ pub fn render(
             "merges"
         },
         avatar: None,
+        theme: Theme::Legacy,
     };
     render_with(rows, &presentation, output, formats, options)
 }
@@ -816,7 +868,10 @@ pub fn render_with(
     }
     let (background, sprites) = artwork(rows, presentation, options.width)?;
     let yuv_sprites: Vec<_> = if yuv {
-        sprites.iter().map(YuvSprite::new).collect()
+        sprites
+            .iter()
+            .map(|sprite| YuvSprite::new(sprite, presentation.theme.background()))
+            .collect()
     } else {
         Vec::new()
     };
@@ -991,10 +1046,16 @@ pub fn render_with(
         .collect())
 }
 
-fn fit_text(library: &Library, value: &str, initial_size: u32, width: i32) -> Result<Text> {
+fn fit_text(
+    library: &Library,
+    value: &str,
+    initial_size: u32,
+    width: i32,
+    theme: Theme,
+) -> Result<Text> {
     let mut size = initial_size.max(1);
     loop {
-        let shaped = text(&font(library, size)?, value)?;
+        let shaped = text(&font(library, size, theme, true)?, value)?;
         if shaped.advance <= f64::from(width) || size == 1 {
             return Ok(shaped);
         }
@@ -1019,6 +1080,119 @@ mod tests {
     use super::*;
 
     #[test]
+    fn rgb_text_blends_each_channel_and_theme_fonts_are_portable() -> Result<()> {
+        let library = Library::init()?;
+        assert_eq!(
+            font(&library, 24, Theme::EBalls, false)?
+                .family_name()
+                .as_deref(),
+            Some("IBM Plex Sans")
+        );
+        assert_eq!(
+            font(&library, 24, Theme::EBalls, true)?
+                .family_name()
+                .as_deref(),
+            Some("IBM Plex Mono")
+        );
+        assert_eq!(Theme::Legacy.background(), [255; 3]);
+        assert_eq!(Theme::Legacy.ink(100), [100; 3]);
+        let shaped = Text {
+            glyphs: vec![Glyph {
+                x: 0,
+                top: 0,
+                width: 3,
+                height: 1,
+                mask: vec![0, 128, 255],
+            }],
+            advance: 3.0,
+            bounds: [0, 0, 3, 1],
+            ascender: 0,
+        };
+        let mut canvas = RgbImage::from_pixel(3, 1, Rgb(Theme::EBalls.background()));
+        shaped.draw(&mut canvas, 0.0, 0, Theme::EBalls.ink(0));
+        assert_eq!(canvas.get_pixel(0, 0).0, [245, 241, 232]);
+        assert_eq!(canvas.get_pixel(1, 0).0, [133, 174, 175]);
+        assert_eq!(canvas.get_pixel(2, 0).0, [21, 107, 118]);
+        Ok(())
+    }
+
+    #[test]
+    fn sparse_downsampling_matches_full_canvas_for_both_palettes() {
+        for theme in [Theme::Legacy, Theme::EBalls] {
+            let background = theme.background();
+            let mut canvas = RgbImage::from_pixel(128, 128, Rgb(background));
+            for (x, y) in [(0, 0), (31, 17), (32, 18), (90, 85), (127, 127)] {
+                canvas.put_pixel(x, y, Rgb(theme.ink(0)));
+            }
+            assert_eq!(
+                downsample_artwork(&canvas, 64, background),
+                imageops::resize(&canvas, 64, 64, FilterType::Lanczos3)
+            );
+        }
+    }
+
+    #[test]
+    fn sprite_edges_and_dirty_yuv_parities_match_full_frame_conversion() {
+        for theme in [Theme::Legacy, Theme::EBalls] {
+            let background = theme.background();
+            let ink = theme.ink(0);
+            let source = RgbImage::from_pixel(64, 64, Rgb(ink));
+            let ball = sprite(&source, 12, 0, 0, background);
+            assert_eq!(&ball.pixels[..3], &background);
+            assert_eq!(
+                &ball.pixels[(12 * 24 + 12) * 3..(12 * 24 + 12) * 3 + 3],
+                &ink
+            );
+            assert!(ball
+                .pixels
+                .chunks_exact(3)
+                .any(|p| p != background && p != ink));
+            for p in ball.pixels.chunks_exact(3) {
+                for c in 0..3 {
+                    assert!((ink[c]..=background[c]).contains(&p[c]));
+                }
+            }
+            let width = 64;
+            let rgb = RgbImage::from_pixel(width as u32, width as u32, Rgb(background)).into_raw();
+            let yuv = yuv_background(&rgb, width);
+            let patch = YuvSprite::new(&ball, background);
+            let mut dirty_rgb = rgb.clone();
+            let mut dirty_yuv = yuv.clone();
+            let mut previous = None;
+            // Cross every chroma parity, overlapping and disjoint dirty rectangles.
+            for (x, y) in [(0, 0), (1, 0), (0, 1), (1, 1), (39, 39), (40, 40)] {
+                if let Some((px, py)) = previous {
+                    copy_rectangle(&mut dirty_rgb, &rgb, width, px, py, ball.diameter, false);
+                    yuv_rectangle(&mut dirty_yuv, &yuv, width, px, py, ball.diameter, None);
+                }
+                copy_rectangle(
+                    &mut dirty_rgb,
+                    &ball.pixels,
+                    width,
+                    x,
+                    y,
+                    ball.diameter,
+                    true,
+                );
+                yuv_rectangle(
+                    &mut dirty_yuv,
+                    &yuv,
+                    width,
+                    x,
+                    y,
+                    ball.diameter,
+                    Some(&patch),
+                );
+                let mut full = rgb.clone();
+                copy_rectangle(&mut full, &ball.pixels, width, x, y, ball.diameter, true);
+                assert_eq!(dirty_rgb, full);
+                assert_eq!(dirty_yuv, yuv_background(&full, width), "parity at {x},{y}");
+                previous = Some((x, y));
+            }
+        }
+    }
+
+    #[test]
     fn speeds_are_linear_and_zero_stays_still() {
         assert_eq!(ball_x(100, 600, 10, 10, 30, 60), 400);
         assert_eq!(ball_x(100, 600, 5, 10, 30, 60), 250);
@@ -1037,6 +1211,7 @@ mod tests {
             singular: "e",
             plural: "e's",
             avatar: Some(&image),
+            theme: Theme::EBalls,
         };
         let rows: Vec<_> = [5773, 5691, 3809, 3292, 109, 4, 734]
             .into_iter()

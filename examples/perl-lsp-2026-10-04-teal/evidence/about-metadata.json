@@ -1,0 +1,13 @@
+{
+  "status": "unsupported",
+  "command": [
+    "gh",
+    "repo",
+    "edit",
+    "--help"
+  ],
+  "exit_code": 89,
+  "error": "CODERABBIT_AGENT_RUNTIME_OWNS_GIT_DELIVERY\nGitHub repo is unavailable inside this Coding task because CodeRabbit owns remote branch and pull request delivery.",
+  "requested_description": "Race occurrences of E in perl-lsp commit messages as a GIF and MP4.",
+  "mutation_attempted": false
+}

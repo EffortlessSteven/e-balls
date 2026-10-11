@@ -149,6 +149,7 @@ def main() -> None:
     parser.add_argument("--project", default="perl-lsp")
     parser.add_argument("--letter", default="e")
     group = parser.add_mutually_exclusive_group()
+    group.add_argument("--since", choices=["7d"], help="seven completed UTC days before --end (default today)")
     group.add_argument("--start", type=dt.date.fromisoformat)
     group.add_argument("--days", type=int, help="completed UTC days; default 7")
     parser.add_argument("--end", type=dt.date.fromisoformat, default=dt.datetime.now(UTC).date(),
