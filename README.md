@@ -2,99 +2,93 @@
 
 # e-balls
 
-A tool that turns a week of [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp) commit messages into a short race between days. Each day is a ball with Steven's avatar; the more occurrences of `e` it has, the faster it goes. You get a GIF, an MP4, and the counts as JSON.
+A GitHub Action that turns a week of [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp) commit messages into a short race between days. Each day is a ball with Steven's avatar; the more occurrences of `e` its commit messages have, the faster it goes. You get a GIF, an MP4, and the counts as JSON.
 
 ![Top 7 perl-lsp days in the past week](examples/perl-lsp-2026-10-04-teal/e-balls.gif)
 
-*Top 7 perl-lsp days in the past week, rendered with `since: 7d`.*
-
-October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04-teal/e-balls.mp4).
+*Top 7 perl-lsp days in the past week, rendered with `since: 7d`.* [MP4](examples/perl-lsp-2026-10-04-teal/e-balls.mp4)
 
 ## Quick start
 
-Build the Rust binary and render the example:
+Copy [examples/weekly.yml](examples/weekly.yml) to `.github/workflows/e-balls.yml`. The workflow:
 
-```sh
-cargo build --release --locked --bins
-./target/release/e-balls \
-  --data examples/perl-lsp-2026-10-04-teal/data.json \
-  --avatar examples/perl-lsp-2026-10-04-teal/avatar.png
-```
+1. Counts the occurrences of `e` in each day's commit messages.
+2. Renders the GIF and MP4 with Steven's avatar on every ball.
+3. Uploads the media and daily counts as a workflow artifact.
 
-Files go to `out/`.
+Run it manually, or let it run every Monday. The first run builds the Rust binary; later runs reuse the cached binary.
 
 ## Render without publishing
 
-To get the files as a workflow artifact instead, run [CI](https://github.com/EffortlessSteven/e-balls/actions/workflows/ci.yml) on demand. The workflow:
+To render on demand and download the files as a workflow artifact, use [examples/artifacts.yml](examples/artifacts.yml):
 
-1. Counts the `e`s committed each day in the example week.
-2. Renders the GIF and MP4.
-3. Uploads the media and counts as the `e-balls-perl-lsp-workflow_dispatch` artifact.
+```yaml
+- uses: EffortlessSteven/e-balls@main
+  id: balls
+  with:
+    repository: EffortlessMetrics/perl-lsp-swarm
+    since: 7d
+    format: both
 
-## Rank a time window
-
-Set `--since 7d` to count the `e`s committed in the past week. The title reads "Occurrences of 'e' in perl-lsp commit messages".
-
-```sh
-python3 scripts/count_letters.py \
-  --repo ../perl-lsp-history.git --ref main \
-  --repository EffortlessMetrics/perl-lsp-swarm \
-  --since 7d --out data.json
+- uses: actions/upload-artifact@v4
+  with:
+    name: e-balls-media
+    path: ${{ steps.balls.outputs.directory }}
 ```
 
-The window covers seven completed UTC days. Set `--end 2026-10-11` to reproduce the example week.
+## Race a time window
+
+Set `since: 7d` to count the last seven completed UTC days. The title reads "Occurrences of 'e' in perl-lsp commit messages". Set `end` to pin the week to a past UTC date.
+
+```yaml
+- uses: EffortlessSteven/e-balls@main
+  with:
+    since: 7d
+```
 
 ## Inputs
 
-For `scripts/count_letters.py`:
-
 | Input | Default | What it does |
 | --- | --- | --- |
-| `--repo` | required | Local Git checkout or bare repository to read. |
-| `--repository` | required | Source `owner/repo`, shown in the footer. |
-| `--ref` | `HEAD` | Branch or commit to read. |
-| `--since` | unset | `7d` selects the past week. |
-| `--letter` | `e` | Letter to count. |
-| `--end` | today | Exclusive UTC end date. |
-| `--out` | required | Output JSON file. |
-
-For `e-balls`:
-
-| Input | Default | What it does |
-| --- | --- | --- |
-| `--data` | required | JSON with the daily counts. |
-| `--avatar` | required | Local portrait to use for every day. |
-| `--format` | `both` | `gif`, `mp4`, or `both`. |
-| `--out` | `out` | New output directory. |
+| `repository` | `EffortlessMetrics/perl-lsp-swarm` | Public `owner/repo` to read Git history from. |
+| `ref` | `main` | Source branch. |
+| `since` | `7d` | Last seven completed UTC days. |
+| `end` | today (UTC) | Optional exclusive UTC end date, such as `2026-10-11`. |
+| `letter` | `e` | ASCII letter to count, case-insensitively. |
+| `project` | `perl-lsp` | Project name shown in the title. |
+| `avatar` | Steven's portrait | Optional local PNG/JPEG to use on every ball. |
+| `data` | unset | Re-render saved counts JSON without reading Git. |
+| `format` | `both` | `gif`, `mp4`, or `both`. |
+| `output` | `e-balls-output` | New output directory. |
+| `asset-base-url` | unset | Optional URL prefix for links in `embed.md`. |
 
 ## Outputs
 
-All outputs are paths in the output directory.
+All outputs are paths on the runner.
 
 | Output | Contents |
 | --- | --- |
-| `e-balls.gif` | Animated GIF. |
-| `e-balls.mp4` | MP4 video. |
-| `manifest.json` | Daily counts and generated file paths. |
-| `data.json` | A snapshot of the commit messages' letter counts. |
-| `avatar.png` | The portrait used for each ball. |
+| `directory` | All generated files, including GIF and/or MP4. |
+| `markdown` | `embed.md`, with links to the rendered media. |
+| `manifest` | `manifest.json` with the counts and generated files. |
+| `data` | `data.json`, with daily counts and per-commit receipts. |
 
-To use the files in another job, upload the output directory as an artifact.
+To use the files in another job, upload `directory` as an artifact.
 
 ## What gets counted
 
-- Only `e` and `E` in commit messages count.
-- A commit present in several merged branches counts once.
+- Only `e` and `E` in full commit messages count.
+- A commit in several merged branches counts once.
 - All authors are included.
 - The seven days are shown in calendar order, using UTC committer dates. Empty days stay still.
-- The fastest ball crosses in one second, so speeds are relative within a clip. Clips last 16 seconds. MP4 is 1080px at 60fps, GIF is 480px at 15fps.
+- The fastest ball crosses in one second, so speeds are relative within a clip. Clips last 16 seconds. MP4 is 1080px at 60fps; GIF is 480px at 15fps.
 
 ## Run it locally
 
 Needs Rust 1.88+, Python 3.10+, Git, FFmpeg, and FreeType headers (`libfreetype6-dev` and `pkg-config` on Ubuntu).
 
 ```sh
-cargo build --release --locked --bins
+cargo build --release --locked --bin e-balls
 
 git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
   https://github.com/EffortlessMetrics/perl-lsp-swarm.git ../perl-lsp-history.git
@@ -112,7 +106,7 @@ Files go to `out/`. Useful flags: `--days`, `--start`, and `--end` for other win
 
 ## More
 
-The `release-balls` CLI and action remain available for release races; see [release publishing details](docs/releases.md).
+The original Release Balls action is available in [legacy](legacy/action.yml); see [release publishing details](docs/releases.md).
 
 ## License
 
