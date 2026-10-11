@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# e-balls GitHub Action: read a public Git branch, verify counts, render media.
+# Git transport and FFmpeg glue. Counting and avatar selection are Rust.
 set -euo pipefail
 
 : "${GITHUB_ACTION_PATH:?}"
@@ -22,17 +22,24 @@ case "$EB_FORMAT" in
   mp4|gif|both) ;;
   *) echo "format must be mp4, gif, or both" >&2; exit 2 ;;
 esac
-
-avatar="$EB_AVATAR"
-if [[ -z "$avatar" ]]; then
-  avatar="$GITHUB_ACTION_PATH/examples/perl-lsp-2026-10-04-teal/avatar.png"
-fi
-if [[ ! -f "$avatar" ]]; then
-  echo "avatar file not found: $avatar" >&2
+if [[ -n "$EB_DATA" && -z "$EB_AVATAR" ]]; then
+  echo "saved data requires an explicit avatar; a top contributor cannot be selected without Git history" >&2
   exit 2
 fi
-avatar=$(realpath "$avatar")
+
+work=""
+cleanup() {
+  if [[ -n "$work" ]]; then
+    rm -rf -- "$work"
+  fi
+}
+trap cleanup EXIT
+
 output=$(realpath -m "$EB_OUTPUT")
+project="$EB_PROJECT"
+if [[ -z "$project" ]]; then
+  project="${EB_REPOSITORY##*/}"
+fi
 
 if [[ -n "$EB_DATA" ]]; then
   if [[ ! -f "$EB_DATA" ]]; then
@@ -40,34 +47,43 @@ if [[ -n "$EB_DATA" ]]; then
     exit 2
   fi
   data=$(realpath "$EB_DATA")
+  avatar=$(realpath "$EB_AVATAR")
 else
-  # Never execute source files. Read the full ancestry from an isolated bare clone.
-  git check-ref-format --branch "$EB_REF" >/dev/null
   work=$(mktemp -d "$RUNNER_TEMP/e-balls-source.XXXXXXXX")
-  trap 'rm -rf -- "$work"' EXIT
-  git clone --bare --filter=blob:none --single-branch --branch "$EB_REF" --no-tags \
-    "https://github.com/$EB_REPOSITORY.git" "$work/history.git"
+  clone_args=(--bare --filter=blob:none --single-branch --no-tags)
+  source_ref=HEAD
+  if [[ -n "$EB_REF" ]]; then
+    git check-ref-format --branch "$EB_REF" >/dev/null
+    clone_args+=(--branch "$EB_REF")
+    source_ref="$EB_REF"
+  fi
+  # Read-only clone; never pass the GitHub token to Git.
+  git clone "${clone_args[@]}" "https://github.com/$EB_REPOSITORY.git" "$work/history.git"
   git -C "$work/history.git" config remote.origin.pushurl DISABLED
   data="$work/counts.json"
-  args=(
-    --repo "$work/history.git" --ref "$EB_REF"
-    --repository "$EB_REPOSITORY" --project "$EB_PROJECT"
+  counter_args=(
+    --repo "$work/history.git" --ref "$source_ref"
+    --repository "$EB_REPOSITORY" --project "$project"
     --letter "$EB_LETTER" --since "$EB_SINCE" --out "$data"
   )
   if [[ -n "$EB_END" ]]; then
-    args+=(--end "$EB_END")
+    counter_args+=(--end "$EB_END")
   fi
-  python3 "$GITHUB_ACTION_PATH/scripts/count_letters.py" "${args[@]}"
-  python3 "$GITHUB_ACTION_PATH/scripts/verify_counts.py" \
-    --repo "$work/history.git" --data "$data" > "$work/count-verification.json"
+  if [[ -z "$EB_AVATAR" ]]; then
+    avatar="$work/top-contributor.png"
+    counter_args+=(--avatar-out "$avatar")
+  else
+    avatar=$(realpath "$EB_AVATAR")
+  fi
+  GITHUB_TOKEN="$EB_TOKEN" "$GITHUB_ACTION_PATH/target/release/e-balls-collect" "${counter_args[@]}"
 fi
 
+if [[ ! -f "$avatar" ]]; then
+  echo "avatar file not found: $avatar" >&2
+  exit 2
+fi
 "$GITHUB_ACTION_PATH/target/release/e-balls" \
   --data "$data" --avatar "$avatar" --format "$EB_FORMAT" --out "$output"
-
-if [[ -z "$EB_DATA" ]]; then
-  cp "$work/count-verification.json" "$output/count-verification.json"
-fi
 
 base="$EB_ASSET_BASE"
 if [[ -n "$base" && "$base" != */ ]]; then
