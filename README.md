@@ -1,16 +1,13 @@
 # e-balls
 
-Occurrences of the letter `e` in perl-lsp commit messages, per day.
-Same head on every ball.
+Occurrences of `E` in [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp)
+(and [perl-lsp-swarm](https://github.com/EffortlessMetrics/perl-lsp-swarm)) commit messages in the past week.
 
-![Seven days of perl-lsp letter counts, with Steven's portrait on every ball](examples/perl-lsp-2026-10-04/e-balls.gif)
+![Occurrences of E in perl-lsp commit messages in the past week](examples/perl-lsp-2026-10-04/e-balls.gif)
 
-A fork of [Maria's Release Balls](https://github.com/maria-rcks/release-balls).
-The bouncing animation, circular portraits, white canvas, and FFmpeg exports
-are retained. The rows are days instead of contributors, and the counts are
-letters instead of pull requests.
+*October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04/e-balls.mp4).*
 
-## Make the clip
+## Quick start
 
 Requires Rust 1.88+, Python 3.10+, Git, FFmpeg, and FreeType headers
 (`libfreetype6-dev` and `pkg-config` on Ubuntu).
