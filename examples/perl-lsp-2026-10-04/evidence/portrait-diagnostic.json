@@ -1,0 +1,7 @@
+{
+  "command": "python3 - <<'PY'\nimport json,subprocess,math\nfrom pathlib import Path\np=Path(\"examples/perl-lsp-2026-10-04\")\ndef rgb(name):\n return subprocess.check_output([\"ffmpeg\",\"-v\",\"error\",\"-i\",str(p/name),\"-frames:v\",\"1\",\"-pix_fmt\",\"rgb24\",\"-f\",\"rawvideo\",\"-\"])\na=rgb(\"evidence/supplied-avatar.png\"); b=rgb(\"avatar.png\")\nassert len(a)==len(b)\nd=[abs(x-y) for x,y in zip(a,b)]\nprint(json.dumps({\"source_magic\":(p/\"evidence/supplied-avatar.png\").read_bytes()[:3].hex(),\"rgb_bytes\":len(a),\"mean_absolute_difference\":sum(d)/len(d),\"max_difference\":max(d),\"psnr_db\":10*math.log10(255**2/(sum(x*x for x in d)/len(d)))},indent=2))\nPY",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:04:08.052360+00:00",
+  "finished_at": "2026-10-11T22:04:08.227160+00:00",
+  "exit_status": 0
+}

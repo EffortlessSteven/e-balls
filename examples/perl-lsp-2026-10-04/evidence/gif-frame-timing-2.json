@@ -1,0 +1,7 @@
+{
+  "command": "ffprobe -v error -select_streams v:0 -show_frames -show_entries frame=pts_time,duration_time -of json examples/perl-lsp-2026-10-04/e-balls.gif > examples/perl-lsp-2026-10-04/gif-frame-timing.json",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:04:28.712872+00:00",
+  "finished_at": "2026-10-11T22:04:28.824200+00:00",
+  "exit_status": 0
+}

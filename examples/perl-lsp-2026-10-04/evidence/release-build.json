@@ -1,0 +1,7 @@
+{
+  "command": "cargo build --release --locked --bins",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:02:10.743929+00:00",
+  "finished_at": "2026-10-11T22:03:31.909580+00:00",
+  "exit_status": 0
+}

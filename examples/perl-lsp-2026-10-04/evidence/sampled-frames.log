@@ -1,0 +1,3 @@
+$ set -e; ffmpeg -v error -ss 0.5 -i examples/perl-lsp-2026-10-04/e-balls.mp4 -frames:v 1 examples/perl-lsp-2026-10-04/preview.png; ffmpeg -v error -i examples/perl-lsp-2026-10-04/e-balls.mp4 -vf "select=eq(n\,30)+eq(n\,270)+eq(n\,510)+eq(n\,930),scale=540:540,tile=2x2" -frames:v 1 examples/perl-lsp-2026-10-04/evidence/mp4-samples.png; ffmpeg -v error -i examples/perl-lsp-2026-10-04/e-balls.gif -vf "select=eq(n\,8)+eq(n\,68)+eq(n\,128)+eq(n\,233),tile=2x2" -frames:v 1 examples/perl-lsp-2026-10-04/evidence/gif-samples.png
+
+Exit status: 0

@@ -1,0 +1,7 @@
+{
+  "command": "cargo fmt --all -- --check",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:00:55.574104+00:00",
+  "finished_at": "2026-10-11T22:00:55.872144+00:00",
+  "exit_status": 0
+}

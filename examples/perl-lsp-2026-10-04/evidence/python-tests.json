@@ -1,0 +1,7 @@
+{
+  "command": "EBALLS_BIN=$PWD/target/release/e-balls python3 -m unittest discover -s tests -v",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:03:35.331639+00:00",
+  "finished_at": "2026-10-11T22:03:36.763044+00:00",
+  "exit_status": 0
+}

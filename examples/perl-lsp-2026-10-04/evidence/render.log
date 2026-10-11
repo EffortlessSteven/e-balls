@@ -1,0 +1,55 @@
+$ ./target/release/e-balls --data /tmp/e-balls-counts.json --avatar /tmp/e-balls-steven.png --format both --out /tmp/e-balls-pinned-render
+{
+  "avatar": "avatar.png",
+  "avatar_policy": "same supplied image on every row",
+  "duration_seconds": 16.0,
+  "files": [
+    {
+      "fps": 60,
+      "path": "e-balls.mp4",
+      "width": 1080
+    },
+    {
+      "fps": 15,
+      "path": "e-balls.gif",
+      "width": 480
+    }
+  ],
+  "renderer": "e-balls",
+  "row_order": "input",
+  "rows": [
+    [
+      "Sun Oct 04",
+      5773
+    ],
+    [
+      "Mon Oct 05",
+      5691
+    ],
+    [
+      "Tue Oct 06",
+      3809
+    ],
+    [
+      "Wed Oct 07",
+      3292
+    ],
+    [
+      "Thu Oct 08",
+      109
+    ],
+    [
+      "Fri Oct 09",
+      4
+    ],
+    [
+      "Sat Oct 10",
+      734
+    ]
+  ],
+  "schema_version": 1,
+  "source_data": "data.json",
+  "speed": "linear count / maximum; fastest crosses in 1 second"
+}
+
+Exit status: 0

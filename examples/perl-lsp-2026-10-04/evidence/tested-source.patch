@@ -1,0 +1,51 @@
+diff --git a/src/bin/e-balls.rs b/src/bin/e-balls.rs
+index 0229905..8f97eb5 100644
+--- a/src/bin/e-balls.rs
++++ b/src/bin/e-balls.rs
+@@ -10,7 +10,10 @@ use std::path::{Path, PathBuf};
+ use std::time::{SystemTime, UNIX_EPOCH};
+ 
+ #[derive(Parser)]
+-#[command(version, about = "Race arbitrary counts with the same head on every ball")]
++#[command(
++    version,
++    about = "Race arbitrary counts with the same head on every ball"
++)]
+ struct Args {
+     /// JSON rows from scripts/count_letters.py, or your own schema-v1 data.
+     #[arg(long)]
+@@ -196,10 +199,7 @@ fn main() -> Result<()> {
+         .unwrap_or(Path::new("."));
+     fs::create_dir_all(parent)?;
+     let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+-    let staging = Staging::create(parent.join(format!(
+-        ".e-balls-{}-{stamp}",
+-        std::process::id()
+-    )))?;
++    let staging = Staging::create(parent.join(format!(".e-balls-{}-{stamp}", std::process::id())))?;
+     let stem = staging.path.join("e-balls");
+     let mut files = Vec::new();
+     for format in ["mp4", "gif"] {
+@@ -295,5 +295,4 @@ mod tests {
+         assert!(!path.exists());
+         Ok(())
+     }
+-
+ }
+diff --git a/src/render.rs b/src/render.rs
+index 5236bc5..f9efb45 100644
+--- a/src/render.rs
++++ b/src/render.rs
+@@ -764,11 +764,7 @@ pub fn render(
+         title: &title,
+         subtitle: "",
+         footer: &footer,
+-        singular: if metric == "changes" {
+-            "line"
+-        } else {
+-            "merge"
+-        },
++        singular: if metric == "changes" { "line" } else { "merge" },
+         plural: if metric == "changes" {
+             "lines"
+         } else {

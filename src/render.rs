@@ -764,11 +764,7 @@ pub fn render(
         title: &title,
         subtitle: "",
         footer: &footer,
-        singular: if metric == "changes" {
-            "line"
-        } else {
-            "merge"
-        },
+        singular: if metric == "changes" { "line" } else { "merge" },
         plural: if metric == "changes" {
             "lines"
         } else {

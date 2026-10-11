@@ -1,0 +1,7 @@
+{
+  "command": "set -e; mkdir -p /tmp/e-balls-ffmpeg /home/vercel-sandbox/runtime/e-balls-tools; cd /tmp/e-balls-ffmpeg; curl -fL --retry 3 --max-time 120 https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg-release-amd64-static.tar.xz; curl -fL --retry 3 --max-time 60 https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5 -o checksum.md5; md5sum -c checksum.md5; sha256sum ffmpeg-release-amd64-static.tar.xz; tar -xJf ffmpeg-release-amd64-static.tar.xz; cp ffmpeg-*-amd64-static/ffmpeg ffmpeg-*-amd64-static/ffprobe /home/vercel-sandbox/runtime/e-balls-tools/; /home/vercel-sandbox/runtime/e-balls-tools/ffmpeg -hide_banner -encoders | rg libx264; /home/vercel-sandbox/runtime/e-balls-tools/ffmpeg -hide_banner -decoders | rg \" h264 \"",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:00:15.382708+00:00",
+  "finished_at": "2026-10-11T22:00:20.476523+00:00",
+  "exit_status": 0
+}

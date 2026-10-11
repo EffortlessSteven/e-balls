@@ -1,0 +1,41 @@
+$ EBALLS_BIN=$PWD/target/release/e-balls python3 -m unittest discover -s tests -v
+test_cli_and_output (test_count_letters.CounterTests.test_cli_and_output) ... ok
+test_committer_not_author_and_utc (test_count_letters.CounterTests.test_committer_not_author_and_utc) ... ok
+test_empty_window_is_not_missing_history (test_count_letters.CounterTests.test_empty_window_is_not_missing_history) ... ok
+test_full_message_case_and_unicode (test_count_letters.CounterTests.test_full_message_case_and_unicode) ... ok
+test_half_open_window (test_count_letters.CounterTests.test_half_open_window) ... ok
+test_independent_verifier_reconciles_raw_objects (test_count_letters.CounterTests.test_independent_verifier_reconciles_raw_objects) ... ok
+test_independent_verifier_rejects_forged_daily_counts (test_count_letters.CounterTests.test_independent_verifier_rejects_forged_daily_counts) ... ok
+test_independent_verifier_rejects_missing_calendar_days (test_count_letters.CounterTests.test_independent_verifier_rejects_missing_calendar_days) ... ok
+test_invalid_letter_and_window (test_count_letters.CounterTests.test_invalid_letter_and_window) ... ok
+test_merge_includes_each_shared_ancestor_once (test_count_letters.CounterTests.test_merge_includes_each_shared_ancestor_once) ... ok
+test_nonmonotonic_ancestors_are_not_pruned (test_count_letters.CounterTests.test_nonmonotonic_ancestors_are_not_pruned) ... ok
+test_other_ascii_letter (test_count_letters.CounterTests.test_other_ascii_letter) ... ok
+test_raw_delimiters_are_message_content (test_count_letters.CounterTests.test_raw_delimiters_are_message_content) ... ok
+test_replacements_are_ignored (test_count_letters.CounterTests.test_replacements_are_ignored) ... ok
+test_replay_pinned_revision_is_identical (test_count_letters.CounterTests.test_replay_pinned_revision_is_identical) ... ok
+test_shallow_clone_is_rejected (test_count_letters.CounterTests.test_shallow_clone_is_rejected) ... ok
+test_unreachable_work_does_not_count (test_count_letters.CounterTests.test_unreachable_work_does_not_count) ... ok
+test_zero_days_are_chronological (test_count_letters.CounterTests.test_zero_days_are_chronological) ... ok
+test_all_zeroes_still_render (test_render_cli.RenderCliTests.test_all_zeroes_still_render) ... ok
+test_both_media_decode_and_receipts_survive (test_render_cli.RenderCliTests.test_both_media_decode_and_receipts_survive) ... ok
+test_existing_output_is_untouched (test_render_cli.RenderCliTests.test_existing_output_is_untouched) ... ok
+test_ffmpeg_failure_leaves_no_completed_or_staging_output (test_render_cli.RenderCliTests.test_ffmpeg_failure_leaves_no_completed_or_staging_output) ... ok
+test_no_portrait_fallback (test_render_cli.RenderCliTests.test_no_portrait_fallback) ... ok
+test_rejects_invalid_counts_before_creating_output (test_render_cli.RenderCliTests.test_rejects_invalid_counts_before_creating_output) ... ok
+test_hash_binds_the_bytes_that_were_actually_verified (test_verify_counts.VerifyCountsTests.test_hash_binds_the_bytes_that_were_actually_verified) ... ok
+test_rejects_a_moving_ref_instead_of_a_pin (test_verify_counts.VerifyCountsTests.test_rejects_a_moving_ref_instead_of_a_pin) ... ok
+test_rejects_boolean_counts (test_verify_counts.VerifyCountsTests.test_rejects_boolean_counts) ... ok
+test_rejects_multiletter_metric (test_verify_counts.VerifyCountsTests.test_rejects_multiletter_metric) ... ok
+test_rejects_non_midnight_window (test_verify_counts.VerifyCountsTests.test_rejects_non_midnight_window) ... ok
+test_rejects_shallow_history_even_when_partial_snapshot_reconciles (test_verify_counts.VerifyCountsTests.test_rejects_shallow_history_even_when_partial_snapshot_reconciles) ... ok
+test_rejects_tampered_committed_at (test_verify_counts.VerifyCountsTests.test_rejects_tampered_committed_at) ... ok
+test_report_retains_zero_days (test_verify_counts.VerifyCountsTests.test_report_retains_zero_days) ... ok
+test_valid_snapshot (test_verify_counts.VerifyCountsTests.test_valid_snapshot) ... ok
+
+----------------------------------------------------------------------
+Ran 33 tests in 0.973s
+
+OK
+
+Exit status: 0

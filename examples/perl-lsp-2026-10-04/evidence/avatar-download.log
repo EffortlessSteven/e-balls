@@ -1,0 +1,6 @@
+$ curl --fail --location --retry 3 --max-time 60 "https://avatars.githubusercontent.com/u/15812269?v=4&s=512" --output /tmp/e-balls-steven.png
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0100 23346 100 23346   0     0 214600     0  --:--:-- --:--:-- --:--:-- 216166
+
+Exit status: 0

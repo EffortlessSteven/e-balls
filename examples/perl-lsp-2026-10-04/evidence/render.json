@@ -1,0 +1,7 @@
+{
+  "command": "./target/release/e-balls --data /tmp/e-balls-counts.json --avatar /tmp/e-balls-steven.png --format both --out /tmp/e-balls-pinned-render",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:03:35.331604+00:00",
+  "finished_at": "2026-10-11T22:03:38.611580+00:00",
+  "exit_status": 0
+}

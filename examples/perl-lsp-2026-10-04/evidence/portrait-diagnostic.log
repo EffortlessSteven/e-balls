@@ -1,0 +1,20 @@
+$ python3 - <<'PY'
+import json,subprocess,math
+from pathlib import Path
+p=Path("examples/perl-lsp-2026-10-04")
+def rgb(name):
+ return subprocess.check_output(["ffmpeg","-v","error","-i",str(p/name),"-frames:v","1","-pix_fmt","rgb24","-f","rawvideo","-"])
+a=rgb("evidence/supplied-avatar.png"); b=rgb("avatar.png")
+assert len(a)==len(b)
+d=[abs(x-y) for x,y in zip(a,b)]
+print(json.dumps({"source_magic":(p/"evidence/supplied-avatar.png").read_bytes()[:3].hex(),"rgb_bytes":len(a),"mean_absolute_difference":sum(d)/len(d),"max_difference":max(d),"psnr_db":10*math.log10(255**2/(sum(x*x for x in d)/len(d)))},indent=2))
+PY
+{
+  "source_magic": "ffd8ff",
+  "rgb_bytes": 634800,
+  "mean_absolute_difference": 0.8525157529930687,
+  "max_difference": 17,
+  "psnr_db": 46.786605053517086
+}
+
+Exit status: 0

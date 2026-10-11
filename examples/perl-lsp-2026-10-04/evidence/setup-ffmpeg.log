@@ -1,0 +1,14 @@
+$ set -e; mkdir -p /tmp/e-balls-ffmpeg /home/vercel-sandbox/runtime/e-balls-tools; cd /tmp/e-balls-ffmpeg; curl -fL --retry 3 --max-time 120 https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o ffmpeg-release-amd64-static.tar.xz; curl -fL --retry 3 --max-time 60 https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz.md5 -o checksum.md5; md5sum -c checksum.md5; sha256sum ffmpeg-release-amd64-static.tar.xz; tar -xJf ffmpeg-release-amd64-static.tar.xz; cp ffmpeg-*-amd64-static/ffmpeg ffmpeg-*-amd64-static/ffprobe /home/vercel-sandbox/runtime/e-balls-tools/; /home/vercel-sandbox/runtime/e-balls-tools/ffmpeg -hide_banner -encoders | rg libx264; /home/vercel-sandbox/runtime/e-balls-tools/ffmpeg -hide_banner -decoders | rg " h264 "
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0  0 40906k   0 196536   0     0 451807     0   0:01:32 --:--:--  0:01:32 451806100 40906k 100 40906k   0     0 44132k     0  --:--:-- --:--:-- --:--:-- 44127k
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0   0     0   0     0     0     0  --:--:-- --:--:-- --:--:--     0100    69 100    69   0     0   301     0  --:--:-- --:--:-- --:--:--   302
+ffmpeg-release-amd64-static.tar.xz: OK
+abda8d77ce8309141f83ab8edf0596834087c52467f6badf376a6a2a4c87cf67  ffmpeg-release-amd64-static.tar.xz
+ V....D libx264              libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
+ V....D libx264rgb           libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 RGB (codec h264)
+ VFS..D h264                 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10
+
+Exit status: 0

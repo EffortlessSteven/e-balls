@@ -1,0 +1,7 @@
+{
+  "command": "cargo test --locked --all-targets",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:01:01.156558+00:00",
+  "finished_at": "2026-10-11T22:02:07.364711+00:00",
+  "exit_status": 0
+}
