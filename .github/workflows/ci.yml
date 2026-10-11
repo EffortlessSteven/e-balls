@@ -39,6 +39,12 @@ jobs:
           rustc --version | tee verification/toolchain.txt
           cargo --version | tee -a verification/toolchain.txt
           ffmpeg -version | head -n 1 | tee -a verification/toolchain.txt
+      - name: Emit formatted Rust collector for source repair
+        run: |
+          cargo fmt --all
+          echo EBALLS_FORMAT_BEGIN
+          base64 -w 80 src/bin/e-balls-collect.rs
+          echo EBALLS_FORMAT_END
       - name: Build both binaries
         run: cargo build --release --locked --bins 2>&1 | tee verification/build.log
       - name: Rust tests
