@@ -112,12 +112,13 @@ jobs:
         id: balls
         with:
           repository: EffortlessMetrics/perl-lsp-swarm
-          ref: main
+          ref: 31b87ee79b8fb55b6433bed7c1f1e4478443d61e
+          project: perl-lsp
           since: 7d
           end: '2026-10-11'
           format: both
           output: ${{ runner.temp }}/e-balls-action-live
-      - name: Verify live counts, Action outputs and playable media
+      - name: Check live counts, real GitHub contributor avatar and playable media
         shell: bash
         env:
           BALLS_DIRECTORY: ${{ steps.balls.outputs.directory }}
@@ -128,27 +129,60 @@ jobs:
           set -euo pipefail
           test -f "$BALLS_DIRECTORY/e-balls.mp4"
           test -f "$BALLS_DIRECTORY/e-balls.gif"
-          test -f "$BALLS_DIRECTORY/count-verification.json"
           test -f "$BALLS_MANIFEST"
           test -f "$BALLS_DATA"
           test -f "$BALLS_MARKDOWN"
           ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.mp4" -f null -
           ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.gif" -f null -
           python3 - <<'PY'
-          import json, os
+          import hashlib, json, os
           from pathlib import Path
           directory = Path(os.environ['BALLS_DIRECTORY'])
           data = json.loads(Path(os.environ['BALLS_DATA']).read_text())
           manifest = json.loads(Path(os.environ['BALLS_MANIFEST']).read_text())
-          verification = json.loads((directory / 'count-verification.json').read_text())
-          assert verification['verified'] is True
-          assert data['source']['repository'] == 'EffortlessMetrics/perl-lsp-swarm'
-          assert data['source']['end_exclusive'] == '2026-10-11T00:00:00Z'
-          assert len(data['rows']) == 7
-          assert verification['daily_counts'] == {row['date']: row['count'] for row in data['rows']}
-          assert verification['source_commit'] == data['source']['commit']
+          source = data['source']
+          top = source['top_contributor']
+          assert source['repository'] == 'EffortlessMetrics/perl-lsp-swarm'
+          assert source['commit'] == '31b87ee79b8fb55b6433bed7c1f1e4478443d61e'
+          assert source['end_exclusive'] == '2026-10-11T00:00:00Z'
+          assert source['total_commits'] == 129
+          assert source['total_count'] == 19412
+          assert [r['count'] for r in data['rows']] == [5773,5691,3809,3292,109,4,734]
+          assert top['login'] and top['id'] > 0 and top['counted_letters'] > 0
+          assert top['sample_commit'] in {r['sha'] for r in source['commits']}
+          assert top['avatar_url'] == f"https://avatars.githubusercontent.com/u/{top['id']}?s=512&v=4"
+          assert hashlib.sha256((directory/'avatar.png').read_bytes()).hexdigest() == top['avatar_sha256']
           assert manifest['rows'] == [[row['label'], row['count']] for row in data['rows']]
           assert 'e-balls.gif' in Path(os.environ['BALLS_MARKDOWN']).read_text()
           assert 'e-balls.mp4' in Path(os.environ['BALLS_MARKDOWN']).read_text()
-          assert (directory / 'avatar.png').is_file()
+          print(json.dumps({'top_contributor':top,'commit':source['commit']},sort_keys=True))
           PY
+      - name: Reject saved data without an explicit avatar
+        shell: bash
+        env:
+          EB_REPOSITORY: EffortlessMetrics/perl-lsp-swarm
+          EB_REF: ''
+          EB_PROJECT: perl-lsp
+          EB_TOKEN: ''
+          EB_SINCE: 7d
+          EB_END: ''
+          EB_LETTER: e
+          EB_AVATAR: ''
+          EB_DATA: examples/perl-lsp-2026-10-04-teal/data.json
+          EB_FORMAT: gif
+          EB_OUTPUT: ${{ runner.temp }}/should-not-exist
+        run: |
+          set -euo pipefail
+          if bash scripts/action_render.sh 2>"$RUNNER_TEMP/reject.log"; then
+            echo "saved data was accepted without an avatar" >&2
+            exit 1
+          fi
+          grep -q "saved data requires an explicit avatar" "$RUNNER_TEMP/reject.log"
+          test ! -e "$EB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e-balls-selected-avatar-${{ github.event_name }}
+          path: ${{ steps.balls.outputs.directory }}
+          if-no-files-found: ignore
+          retention-days: 7
