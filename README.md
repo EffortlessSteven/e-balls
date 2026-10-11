@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" alt="" width="96" align="right">
+
 # e-balls
 
 Occurrences of `E` in [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp)
@@ -5,7 +7,9 @@ Occurrences of `E` in [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp)
 
 ![Occurrences of E in perl-lsp commit messages in the past week](examples/perl-lsp-2026-10-04/e-balls.gif)
 
-*October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04/e-balls.mp4).*
+*Top 7 perl-lsp days in the past week, rendered with `since: 7d`.*
+
+October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04/e-balls.mp4).
 
 ## Quick start
 
