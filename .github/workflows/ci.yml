@@ -48,13 +48,14 @@ jobs:
       - name: Git collector and actual CLI/media tests
         env:
           EBALLS_BIN: target/release/e-balls
+          EBALLS_COLLECT_BIN: target/release/e-balls-collect
         run: python3 -m unittest discover -s tests -v 2>&1 | tee verification/python-tests.log
       - name: Render the pinned perl-lsp example
         run: |
           git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
             https://github.com/EffortlessMetrics/perl-lsp-swarm.git "$RUNNER_TEMP/perl-lsp.git"
           git -C "$RUNNER_TEMP/perl-lsp.git" config remote.origin.pushurl DISABLED
-          python3 scripts/count_letters.py \
+          ./target/release/e-balls-collect \
             --repo "$RUNNER_TEMP/perl-lsp.git" \
             --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
             --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
