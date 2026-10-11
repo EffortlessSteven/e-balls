@@ -148,6 +148,45 @@ class CounterTests(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(json.loads(output.read_text())["source"]["total_count"], 2)
 
+    def run_since(self, *args):
+        output = Path(self.tmp.name) / "since.json"
+        proc = subprocess.run([
+            "python3", str(ROOT / "scripts/count_letters.py"), "--repo", str(self.repo),
+            "--ref", "main", "--repository", "example/project", "--out", str(output),
+            "--since", "7d", *args,
+        ], capture_output=True, text=True)
+        return proc, output
+
+    def test_since_pinned_end_matches_explicit_week(self):
+        a = self.commit(b"e", "2026-10-04T00:00:00+00:00")
+        b = self.commit(b"ee", "2026-10-10T23:59:59+00:00", (a,))
+        self.commit(b"eee", "2026-10-11T00:00:00+00:00", (b,))
+        proc, output = self.run_since("--end", END.isoformat())
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(output.read_text()), self.collect())
+
+    def test_since_defaults_to_seven_completed_utc_days(self):
+        self.commit(b"e")
+        before = dt.datetime.now(dt.timezone.utc).date()
+        proc, output = self.run_since()
+        after = dt.datetime.now(dt.timezone.utc).date()
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        data = json.loads(output.read_text())
+        end = dt.date.fromisoformat(data["source"]["end_exclusive"][:10])
+        self.assertIn(end, [before, after])
+        self.assertEqual(data["source"]["start_inclusive"],
+                         (end - dt.timedelta(days=7)).isoformat() + "T00:00:00Z")
+        self.assertEqual(len(data["rows"]), 7)
+
+    def test_since_rejects_explicit_conflicts_and_unsupported_values(self):
+        self.commit(b"e")
+        for args in [("--days", "7"), ("--days", "2"),
+                     ("--start", START.isoformat()), ("--since", "8d")]:
+            with self.subTest(args=args):
+                proc, output = self.run_since(*args)
+                self.assertEqual(proc.returncode, 2, proc.stderr)
+                self.assertFalse(output.exists())
+
     def test_independent_verifier_reconciles_raw_objects(self):
         a = self.commit(b"eE\n\nbody e")
         self.commit(b"e", parents=(a,))

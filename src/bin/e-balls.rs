@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use image::{ImageReader, Rgb, RgbImage};
-use release_balls::render::{render_with, Options, Presentation};
+use release_balls::render::{render_with, Options, Presentation, Theme};
 use serde::Deserialize;
 use serde_json::json;
 use std::fs;
@@ -119,12 +119,16 @@ fn portrait(bytes: &[u8]) -> Result<RgbImage> {
     if image.width() == 0 || image.height() == 0 {
         bail!("avatar must not be empty");
     }
-    // Keep transparent portraits on the same white canvas as the original renderer.
+    // Composite transparency before resizing, using the same cream as the arena.
+    let background = Theme::EBalls.background();
     Ok(RgbImage::from_fn(image.width(), image.height(), |x, y| {
         let pixel = image.get_pixel(x, y);
         let alpha = u32::from(pixel[3]);
         Rgb(std::array::from_fn(|channel| {
-            ((u32::from(pixel[channel]) * alpha + 255 * (255 - alpha) + 127) / 255) as u8
+            ((u32::from(pixel[channel]) * alpha
+                + u32::from(background[channel]) * (255 - alpha)
+                + 127)
+                / 255) as u8
         }))
     }))
 }
@@ -185,6 +189,7 @@ fn main() -> Result<()> {
         singular: data.unit_singular.as_deref().unwrap_or(&data.unit),
         plural: &data.unit,
         avatar: Some(&image),
+        theme: Theme::EBalls,
     };
     // Preserve chronological/input order. Do not rank or normalize away small counts.
     let rows: Vec<_> = data
@@ -225,7 +230,10 @@ fn main() -> Result<()> {
     fs::write(staging.path.join("data.json"), &bytes)?;
     image.save(staging.path.join("avatar.png"))?;
     let manifest = json!({
-        "schema_version": 1, "renderer": "e-balls", "source_data": "data.json",
+        "schema_version": 1, "renderer": "e-balls",
+        "theme": {"name": "teal-cream", "background": "#f5f1e8", "foreground": "#156b76",
+            "primary_font": "IBM Plex Sans Regular", "data_font": "IBM Plex Mono Regular",
+            "font_sources": serde_json::from_str::<serde_json::Value>(include_str!("../../assets/plex-manifest.json"))?}, "source_data": "data.json",
         "avatar": "avatar.png", "avatar_policy": "same supplied image on every row",
         "row_order": "input", "speed": "linear count / maximum; fastest crosses in 1 second",
         "duration_seconds": args.duration, "rows": rows, "files": files,
@@ -246,6 +254,21 @@ mod tests {
     fn value() -> serde_json::Value {
         json!({"schema_version":1,"title":"e","footer":"source","unit":"e's",
             "rows":[{"label":"Monday","count":0},{"label":"Tuesday","count":4}]})
+    }
+
+    #[test]
+    fn transparent_portrait_flattens_to_cream() -> Result<()> {
+        let mut rgba = image::RgbaImage::new(3, 1);
+        rgba.put_pixel(0, 0, image::Rgba([255, 0, 255, 0]));
+        rgba.put_pixel(1, 0, image::Rgba([21, 107, 118, 128]));
+        rgba.put_pixel(2, 0, image::Rgba([21, 107, 118, 255]));
+        let mut bytes = Cursor::new(Vec::new());
+        rgba.write_to(&mut bytes, image::ImageFormat::Png)?;
+        let image = portrait(bytes.get_ref())?;
+        assert_eq!(image.get_pixel(0, 0).0, [245, 241, 232]);
+        assert_eq!(image.get_pixel(1, 0).0, [133, 174, 175]);
+        assert_eq!(image.get_pixel(2, 0).0, [21, 107, 118]);
+        Ok(())
     }
 
     #[test]
