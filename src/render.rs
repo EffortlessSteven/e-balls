@@ -8,6 +8,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::time::Duration;
 
 pub struct Options {
@@ -205,8 +206,9 @@ fn fallback_avatar(login: &str, library: &Library) -> Result<RgbImage> {
     Ok(image)
 }
 
+#[derive(Clone)]
 struct Sprite {
-    pixels: Vec<u8>,
+    pixels: Arc<[u8]>,
     diameter: usize,
     y: i32,
     radius: i32,
@@ -244,7 +246,7 @@ fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64) -> Sprite {
         }
     }
     Sprite {
-        pixels: ball.into_raw(),
+        pixels: ball.into_raw().into(),
         diameter: diameter as usize,
         y,
         radius,
@@ -361,6 +363,18 @@ fn artwork(
     } else {
         (500.0 + (layout_rows - 3) as f64 * 28.0) / (layout_rows - 1) as f64
     };
+    let radius =
+        rounded((76.0 * text_scale).min(row_height * 0.4) * f64::from(width) / 1080.0).max(1);
+    // Keep dense sprite rectangles separated after pixel rounding,
+    // including their YUV chroma cells.
+    let radius = if rows.len() > 12 {
+        radius
+            .min(((row_height * f64::from(width) / 1080.0 - 1.0) / 2.0).floor() as i32)
+            .max(1)
+    } else {
+        radius
+    };
+    let shared_avatar = presentation.avatar.map(|image| sprite(image, radius, 0, 0));
     let client = if presentation.avatar.is_none() {
         Some(
             Client::builder()
@@ -376,27 +390,34 @@ fn artwork(
     // Bound avatar download concurrency and decoded-image memory even for
     // thousands of contributors. Only the small rendered sprites persist.
     for (batch, chunk) in rows.chunks(8).enumerate() {
-        let sources: Vec<Result<RgbImage>> = std::thread::scope(|scope| {
-            let handles: Vec<_> = chunk
-                .iter()
-                .map(|(login, _)| {
-                    let client = &client;
-                    scope.spawn(move || match presentation.avatar {
-                        Some(image) => Ok(image.clone()),
-                        None => avatar(login, client.as_ref().context("avatar client unavailable")?),
+        let balls: Vec<Result<Sprite>> = if let Some(ball) = &shared_avatar {
+            chunk.iter().map(|_| Ok(ball.clone())).collect()
+        } else {
+            std::thread::scope(|scope| {
+                let handles: Vec<_> = chunk
+                    .iter()
+                    .map(|(login, _)| {
+                        let client = &client;
+                        scope.spawn(move || {
+                            let image = avatar(
+                                login,
+                                client.as_ref().context("avatar client unavailable")?,
+                            )?;
+                            Ok(sprite(&image, radius, 0, 0))
+                        })
                     })
-                })
-                .collect();
-            handles
-                .into_iter()
-                .map(|handle| {
-                    handle
-                        .join()
-                        .unwrap_or_else(|_| Err(anyhow::anyhow!("avatar download panicked")))
-                })
-                .collect()
-        });
-        for (offset, ((login, count), source)) in chunk.iter().zip(sources).enumerate() {
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|handle| {
+                        handle
+                            .join()
+                            .unwrap_or_else(|_| Err(anyhow::anyhow!("avatar download panicked")))
+                    })
+                    .collect()
+            })
+        };
+        for (offset, ((login, count), ball)) in chunk.iter().zip(balls).enumerate() {
             let index = batch * 8 + offset;
             let column = index / layout_rows;
             let column_start = column * layout_rows;
@@ -405,18 +426,6 @@ fn artwork(
             let cell_x = 70.0 + column as f64 * 940.0 / columns as f64;
 
             let y = center + (row as f64 - (column_rows as f64 - 1.0) / 2.0) * row_height;
-            let radius =
-                rounded((76.0 * text_scale).min(row_height * 0.4) * f64::from(width) / 1080.0)
-                    .max(1);
-            // Keep dense sprite rectangles separated after pixel rounding,
-            // including their YUV chroma cells.
-            let radius = if rows.len() > 12 {
-                radius
-                    .min(((row_height * f64::from(width) / 1080.0 - 1.0) / 2.0).floor() as i32)
-                    .max(1)
-            } else {
-                radius
-            };
             names[index].draw(
                 &mut canvas,
                 f64::from(n(cell_x)),
@@ -442,17 +451,12 @@ fn artwork(
                     - count_text.bounds[1],
                 0,
             );
-            let source = match source {
-                Ok(image) => image,
-                Err(error) if presentation.avatar.is_some() => return Err(error),
-                Err(_) => fallback_avatar(login, &library)?,
+            let mut ball = match ball {
+                Ok(ball) => ball,
+                Err(_) => sprite(&fallback_avatar(login, &library)?, radius, 0, 0),
             };
-            let mut ball = sprite(
-                &source,
-                radius,
-                rounded(y * f64::from(width) / 1080.0),
-                *count,
-            );
+            ball.y = rounded(y * f64::from(width) / 1080.0);
+            ball.count = *count;
             let (left, right) = if rows.len() <= 12 {
                 ((70.0 + label_width + 24.0 + 76.0).max(350.0), 980.0)
             } else {
@@ -1052,6 +1056,7 @@ mod tests {
             );
             for sprite in &sprites {
                 assert_eq!(sprite.pixels, sprites[0].pixels);
+                assert!(Arc::ptr_eq(&sprite.pixels, &sprites[0].pixels));
                 assert!(sprite.y - sprite.radius >= 0);
                 assert!(sprite.y + sprite.radius < width as i32);
                 for frame in 0..960 {
@@ -1060,6 +1065,13 @@ mod tests {
                     assert!(x + sprite.radius < width as i32);
                 }
             }
+        }
+        let dense_rows: Vec<_> = rows.iter().chain(&rows).cloned().collect();
+        let (_, sprites) = artwork(&dense_rows, &presentation, 320)?;
+        assert_eq!(sprites.len(), dense_rows.len());
+        for (sprite, (_, count)) in sprites.iter().zip(&dense_rows) {
+            assert!(Arc::ptr_eq(&sprite.pixels, &sprites[0].pixels));
+            assert_eq!(sprite.count, *count);
         }
         Ok(())
     }
