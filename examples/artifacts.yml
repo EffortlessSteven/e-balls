@@ -1,4 +1,4 @@
-name: Release Balls
+name: e-balls
 on:
   workflow_dispatch:
 
@@ -9,16 +9,14 @@ jobs:
   render:
     runs-on: ubuntu-latest
     steps:
-      - uses: maria-rcks/release-balls@v1
+      - uses: EffortlessSteven/e-balls@main
         id: balls
         with:
-          repository: pingdotgg/t3code
-          releases: '5'
-          match: nightly
-          metric: merger
+          repository: EffortlessMetrics/perl-lsp-swarm
+          since: 7d
           format: both
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-media
+          name: e-balls-media
           path: ${{ steps.balls.outputs.directory }}
