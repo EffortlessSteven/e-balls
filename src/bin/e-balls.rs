@@ -82,7 +82,9 @@ impl Data {
         let mut total = 0_u64;
         for row in &self.rows {
             label(&row.label, "row label", 80, false)?;
-            total = total.checked_add(row.count).context("sum of counts exceeds u64")?;
+            total = total
+                .checked_add(row.count)
+                .context("sum of counts exceeds u64")?;
         }
         Ok(())
     }
@@ -107,7 +109,10 @@ fn portrait(bytes: &[u8]) -> Result<RgbImage> {
     limits.max_image_height = Some(4096);
     limits.max_alloc = Some(64 * 1024 * 1024);
     reader.limits(limits);
-    let image = reader.decode().context("avatar must be a valid PNG or JPEG")?.to_rgba8();
+    let image = reader
+        .decode()
+        .context("avatar must be a valid PNG or JPEG")?
+        .to_rgba8();
     if image.width() == 0 || image.height() == 0 {
         bail!("avatar must not be empty");
     }
@@ -121,10 +126,35 @@ fn portrait(bytes: &[u8]) -> Result<RgbImage> {
     }))
 }
 
-struct Staging(PathBuf);
+struct Staging {
+    path: PathBuf,
+    active: bool,
+}
+
+impl Staging {
+    fn create(path: PathBuf) -> Result<Self> {
+        // Acquire ownership before constructing a cleanup guard. A name collision
+        // must never cause Drop to delete a directory belonging to another run.
+        fs::create_dir(&path)?;
+        Ok(Self { path, active: true })
+    }
+
+    fn publish(mut self, destination: &Path) -> Result<()> {
+        if fs::symlink_metadata(destination).is_ok() {
+            bail!("output already exists; choose a new --out directory");
+        }
+        fs::rename(&self.path, destination)
+            .context("could not publish completed output directory")?;
+        self.active = false;
+        Ok(())
+    }
+}
+
 impl Drop for Staging {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
+        if self.active {
+            let _ = fs::remove_dir_all(&self.path);
+        }
     }
 }
 
@@ -154,13 +184,23 @@ fn main() -> Result<()> {
         avatar: Some(&image),
     };
     // Preserve chronological/input order. Do not rank or normalize away small counts.
-    let rows: Vec<_> = data.rows.iter().map(|row| (row.label.clone(), row.count)).collect();
-    let parent = args.out.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let rows: Vec<_> = data
+        .rows
+        .iter()
+        .map(|row| (row.label.clone(), row.count))
+        .collect();
+    let parent = args
+        .out
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     fs::create_dir_all(parent)?;
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    let staging = Staging(parent.join(format!(".e-balls-{}-{stamp}", std::process::id())));
-    fs::create_dir(&staging.0)?;
-    let stem = staging.0.join("e-balls");
+    let staging = Staging::create(parent.join(format!(
+        ".e-balls-{}-{stamp}",
+        std::process::id()
+    )))?;
+    let stem = staging.path.join("e-balls");
     let mut files = Vec::new();
     for format in ["mp4", "gif"] {
         if args.format != "both" && args.format != format {
@@ -175,19 +215,26 @@ fn main() -> Result<()> {
             strategy: if format == "gif" { "dirty" } else { "yuv" }.into(),
         };
         render_with(&rows, &presentation, &stem, &[format], &options)?;
-        files.push(json!({"path": format!("e-balls.{format}"), "width": options.width, "fps": options.fps}));
+        files.push(json!({
+            "path": format!("e-balls.{format}"),
+            "width": options.width,
+            "fps": options.fps,
+        }));
     }
     // Freeze the exact input, including any source receipts not interpreted by this CLI.
-    fs::write(staging.0.join("data.json"), &bytes)?;
-    image.save(staging.0.join("avatar.png"))?;
+    fs::write(staging.path.join("data.json"), &bytes)?;
+    image.save(staging.path.join("avatar.png"))?;
     let manifest = json!({
         "schema_version": 1, "renderer": "e-balls", "source_data": "data.json",
         "avatar": "avatar.png", "avatar_policy": "same supplied image on every row",
         "row_order": "input", "speed": "linear count / maximum; fastest crosses in 1 second",
         "duration_seconds": args.duration, "rows": rows, "files": files,
     });
-    fs::write(staging.0.join("manifest.json"), format!("{}\n", serde_json::to_string_pretty(&manifest)?))?;
-    fs::rename(&staging.0, &args.out).context("could not publish completed output directory")?;
+    fs::write(
+        staging.path.join("manifest.json"),
+        format!("{}\n", serde_json::to_string_pretty(&manifest)?),
+    )?;
+    staging.publish(&args.out)?;
     println!("{}", serde_json::to_string_pretty(&manifest)?);
     Ok(())
 }
@@ -217,7 +264,12 @@ mod tests {
             v["rows"][0]["count"] = count;
             assert!(serde_json::from_value::<Data>(v).is_err());
         }
-        for (key, bad) in [("schema_version", json!(2)), ("title", json!("")), ("unit", json!("e\n")), ("rows", json!([]))] {
+        for (key, bad) in [
+            ("schema_version", json!(2)),
+            ("title", json!("")),
+            ("unit", json!("e\n")),
+            ("rows", json!([])),
+        ] {
             let mut v = value();
             v[key] = bad;
             assert!(serde_json::from_value::<Data>(v)?.validate().is_err());
@@ -227,4 +279,21 @@ mod tests {
         assert!(serde_json::from_value::<Data>(v)?.validate().is_err());
         Ok(())
     }
+
+    #[test]
+    fn staging_collision_does_not_delete_another_runs_output() -> Result<()> {
+        let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "e-balls-staging-test-{}-{stamp}",
+            std::process::id()
+        ));
+        let owner = Staging::create(path.clone())?;
+        fs::write(path.join("keep.txt"), b"keep")?;
+        assert!(Staging::create(path.clone()).is_err());
+        assert_eq!(fs::read(path.join("keep.txt"))?, b"keep");
+        drop(owner);
+        assert!(!path.exists());
+        Ok(())
+    }
+
 }
