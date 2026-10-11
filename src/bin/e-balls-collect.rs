@@ -2,7 +2,7 @@
 //! The rasterizer remains src/bin/e-balls.rs; this binary supplies measured rows
 //! and (when requested) the actual top contributor's linked GitHub avatar.
 use anyhow::{anyhow, bail, Context, Result};
-use chrono::{DateTime, Datelike, Duration as DateDuration, NaiveDate, Utc};
+use chrono::{DateTime, Duration as DateDuration, NaiveDate, Utc};
 use clap::Parser;
 use reqwest::blocking::Client;
 use reqwest::redirect::Policy;
@@ -19,7 +19,10 @@ const MAX_DAYS: i64 = 366;
 const MAX_OBJECT: usize = 32 * 1024 * 1024;
 
 #[derive(Parser)]
-#[command(version, about = "Count letters in commit messages and select the top contributor")]
+#[command(
+    version,
+    about = "Count letters in commit messages and select the top contributor"
+)]
 struct Args {
     #[arg(long)]
     repo: PathBuf,
@@ -68,8 +71,7 @@ fn sha256(bytes: &[u8]) -> String {
 }
 
 fn is_sha(value: &str) -> bool {
-    (value.len() == 40 || value.len() == 64)
-        && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    (value.len() == 40 || value.len() == 64) && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn git(repo: &Path, args: &[&str]) -> Result<Vec<u8>> {
@@ -96,7 +98,9 @@ fn parse_author(headers: &[u8]) -> Result<(String, String, bool)> {
         .find(|line| line.starts_with(b"author "))
         .context("commit is missing its author header")?;
     let text = String::from_utf8_lossy(line);
-    let left = text.rfind('<').context("author email has no opening bracket")?;
+    let left = text
+        .rfind('<')
+        .context("author email has no opening bracket")?;
     let right = text[left..]
         .find('>')
         .map(|index| index + left)
@@ -160,6 +164,8 @@ fn validate_repository(repository: &str) -> Result<()> {
     if name.contains('/')
         || [owner, name].iter().any(|value| {
             value.is_empty()
+                || *value == "."
+                || *value == ".."
                 || !value
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || b"_.-".contains(&byte))
@@ -190,9 +196,15 @@ fn count(
     if git(repo, &["rev-parse", "--is-shallow-repository"])?.trim_ascii() != b"false" {
         bail!("shallow history cannot produce complete counts; fetch full ancestry");
     }
-    let pin = String::from_utf8(
-        git(repo, &["rev-parse", "--verify", "--end-of-options", &format!("{reference}^{{commit}}")])?,
-    )?
+    let pin = String::from_utf8(git(
+        repo,
+        &[
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{reference}^{{commit}}"),
+        ],
+    )?)?
     .trim()
     .to_owned();
     if !is_sha(&pin) {
@@ -214,7 +226,10 @@ fn count(
     let revisions = git(repo, &["rev-list", "--timestamp", &pin, "--"])?;
     let mut unique = BTreeSet::new();
     let mut selected = Vec::<(i64, String)>::new();
-    for line in revisions.split(|byte| *byte == b'\n').filter(|line| !line.is_empty()) {
+    for line in revisions
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+    {
         let text = std::str::from_utf8(line).context("non-UTF-8 rev-list output")?;
         let Some((timestamp, sha)) = text.split_once(' ') else {
             bail!("invalid rev-list output");
@@ -300,15 +315,28 @@ fn count(
                     .context("timestamp is outside the supported range")?;
                 let day = when.date_naive().to_string();
                 let value = count_ascii(message, letter);
-                let bucket = buckets.get_mut(&day).context("selected commit lies outside window")?;
-                bucket.0 = bucket.0.checked_add(value).context("daily count overflow")?;
+                let bucket = buckets
+                    .get_mut(&day)
+                    .context("selected commit lies outside window")?;
+                bucket.0 = bucket
+                    .0
+                    .checked_add(value)
+                    .context("daily count overflow")?;
                 bucket.1 += 1;
 
                 let (identity, name, bot) = parse_author(headers)?;
                 let author = authors.entry(identity.clone()).or_insert_with(|| Author {
-                    key: identity, name, count: 0, commits: 0, shas: Vec::new(), bot,
+                    key: identity,
+                    name,
+                    count: 0,
+                    commits: 0,
+                    shas: Vec::new(),
+                    bot,
                 });
-                author.count = author.count.checked_add(value).context("author count overflow")?;
+                author.count = author
+                    .count
+                    .checked_add(value)
+                    .context("author count overflow")?;
                 author.commits += 1;
                 author.shas.push(sha.to_owned());
                 receipts.push(json!({
@@ -324,7 +352,9 @@ fn count(
         if processed.is_err() {
             let _ = child.kill();
         }
-        let write_result = writer.join().map_err(|_| anyhow!("git stdin writer panicked"))?;
+        let write_result = writer
+            .join()
+            .map_err(|_| anyhow!("git stdin writer panicked"))?;
         let status = child.wait()?;
         processed?;
         write_result.context("could not stream selected commit SHAs")?;
@@ -377,11 +407,15 @@ fn count(
 }
 
 fn fetch_bounded(client: &Client, url: &str, token: Option<&str>, limit: u64) -> Result<Vec<u8>> {
-    let mut request = client.get(url).header("Accept", "application/vnd.github+json");
+    let mut request = client
+        .get(url)
+        .header("Accept", "application/vnd.github+json");
     if let Some(token) = token.filter(|token| !token.is_empty()) {
         request = request.bearer_auth(token);
     }
-    let response = request.send().with_context(|| format!("HTTP request failed: {url}"))?;
+    let response = request
+        .send()
+        .with_context(|| format!("HTTP request failed: {url}"))?;
     let status = response.status();
     if !status.is_success() {
         bail!("GitHub response {status} from {url}");
@@ -394,14 +428,10 @@ fn fetch_bounded(client: &Client, url: &str, token: Option<&str>, limit: u64) ->
     Ok(bytes)
 }
 
-fn fetch_top_avatar(
-    repository: &str,
-    ranked: &[Author],
-    destination: &Path,
-) -> Result<Value> {
-    let top = ranked.first().context(
-        "no non-bot contributor in the selected window; use an explicit avatar input"
-    )?;
+fn fetch_top_avatar(repository: &str, ranked: &[Author], destination: &Path) -> Result<Value> {
+    let top = ranked
+        .first()
+        .context("no non-bot contributor in the selected window; use an explicit avatar input")?;
     let client = Client::builder()
         .user_agent("EffortlessSteven/e-balls")
         .timeout(Duration::from_secs(25))
@@ -432,7 +462,7 @@ fn fetch_top_avatar(
         break;
     }
     let (login, id, sample_sha) = linked.context(
-        "top Git author is not associated with a GitHub account; use an explicit avatar input"
+        "top Git author is not associated with a GitHub account; use an explicit avatar input",
     )?;
     // Construct the image URL from an ID returned by GitHub. The API token
     // never accompanies requests to the avatar host.
@@ -444,7 +474,10 @@ fn fetch_top_avatar(
     if image.width() == 0 || image.height() == 0 || image.width() > 2048 || image.height() > 2048 {
         bail!("GitHub contributor avatar dimensions are invalid");
     }
-    let parent = destination.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let parent = destination
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     fs::create_dir_all(parent)?;
     image.save_with_format(destination, image::ImageFormat::Png)?;
     let normalized = fs::read(destination)?;
@@ -462,10 +495,16 @@ fn fetch_top_avatar(
 }
 
 fn write_json(path: &Path, value: &Value) -> Result<()> {
-    let directory = path.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or(Path::new("."));
+    let directory = path
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
     fs::create_dir_all(directory)?;
     let unique = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    let temporary = directory.join(format!(".e-balls-count-{}-{unique}.json", std::process::id()));
+    let temporary = directory.join(format!(
+        ".e-balls-count-{}-{unique}.json",
+        std::process::id()
+    ));
     let result = (|| -> Result<()> {
         let bytes = format!("{}\n", serde_json::to_string_pretty(value)?);
         fs::write(&temporary, bytes)?;
@@ -499,17 +538,30 @@ fn run(args: Args) -> Result<()> {
         end - DateDuration::days(days)
     };
     let (mut value, authors) = count(
-        &args.repo, &args.r#ref, &args.repository, &args.project,
-        start, end, letter[0].to_ascii_lowercase()
+        &args.repo,
+        &args.r#ref,
+        &args.repository,
+        &args.project,
+        start,
+        end,
+        letter[0].to_ascii_lowercase(),
     )?;
     if let Some(destination) = &args.avatar_out {
         let contributor = fetch_top_avatar(&args.repository, &authors, destination)?;
         value["source"]["top_contributor"] = contributor;
     }
-    let count = value["source"]["total_count"].as_u64().context("missing count")?;
-    let commits = value["source"]["total_commits"].as_u64().context("missing commits")?;
+    let count = value["source"]["total_count"]
+        .as_u64()
+        .context("missing count")?;
+    let commits = value["source"]["total_commits"]
+        .as_u64()
+        .context("missing commits")?;
     write_json(&args.out, &value)?;
-    println!("{commits} commits, {count} letters, {} → {}", value["source"]["commit"], args.out.display());
+    println!(
+        "{commits} commits, {count} letters, {} → {}",
+        value["source"]["commit"],
+        args.out.display()
+    );
     Ok(())
 }
 
@@ -527,7 +579,10 @@ mod tests {
         assert!(!is_sha("HEAD"));
         assert!(!is_sha(&"g".repeat(40)));
         assert_eq!(count_ascii("éEEE ee".as_bytes(), b'e'), 5);
-        assert_eq!(sha256(b"abc"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(
+            sha256(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
     }
 
     #[test]
@@ -543,10 +598,36 @@ mod tests {
 
     #[test]
     fn rank_by_letters_then_commits_then_identity_and_ignore_bots() {
-        let one = Author { key: "email:abc@example.com".into(), name: "A".into(), count: 30, commits: 2, shas: vec![], bot: false };
-        let two = Author { key: "email:xyz@example.com".into(), name: "B".into(), count: 30, commits: 3, shas: vec![], bot: false };
-        let bot = Author { key: "email:bot".into(), name: "B".into(), count: 300, commits: 4, shas: vec![], bot: true };
-        let ranked = ranked_authors([one, two, bot].into_iter().map(|a| (a.key.clone(), a)).collect());
+        let one = Author {
+            key: "email:abc@example.com".into(),
+            name: "A".into(),
+            count: 30,
+            commits: 2,
+            shas: vec![],
+            bot: false,
+        };
+        let two = Author {
+            key: "email:xyz@example.com".into(),
+            name: "B".into(),
+            count: 30,
+            commits: 3,
+            shas: vec![],
+            bot: false,
+        };
+        let bot = Author {
+            key: "email:bot".into(),
+            name: "B".into(),
+            count: 300,
+            commits: 4,
+            shas: vec![],
+            bot: true,
+        };
+        let ranked = ranked_authors(
+            [one, two, bot]
+                .into_iter()
+                .map(|a| (a.key.clone(), a))
+                .collect(),
+        );
         assert_eq!(ranked.len(), 2);
         assert_eq!(ranked[0].key, "email:xyz@example.com");
         assert_eq!(ranked[1].key, "email:abc@example.com");
@@ -555,7 +636,13 @@ mod tests {
     #[test]
     fn refuse_bad_repositories() {
         assert!(validate_repository("owner/repo").is_ok());
-        for bad in ["owner", "owner/repo/extra", "../repo", "owner/repo name", ""] {
+        for bad in [
+            "owner",
+            "owner/repo/extra",
+            "../repo",
+            "owner/repo name",
+            "",
+        ] {
             assert!(validate_repository(bad).is_err(), "{bad}");
         }
     }

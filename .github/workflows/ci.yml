@@ -39,12 +39,6 @@ jobs:
           rustc --version | tee verification/toolchain.txt
           cargo --version | tee -a verification/toolchain.txt
           ffmpeg -version | head -n 1 | tee -a verification/toolchain.txt
-      - name: Emit formatted Rust collector for source repair
-        run: |
-          cargo fmt --all
-          echo EBALLS_FORMAT_BEGIN
-          base64 -w 80 src/bin/e-balls-collect.rs
-          echo EBALLS_FORMAT_END
       - name: Build both binaries
         run: cargo build --release --locked --bins 2>&1 | tee verification/build.log
       - name: Rust tests
@@ -175,6 +169,8 @@ jobs:
           EB_LETTER: e
           EB_AVATAR: ''
           EB_DATA: examples/perl-lsp-2026-10-04-teal/data.json
+          GITHUB_ACTION_PATH: ${{ github.workspace }}
+          GITHUB_OUTPUT: ${{ runner.temp }}/saved-reject-output.txt
           EB_FORMAT: gif
           EB_OUTPUT: ${{ runner.temp }}/should-not-exist
         run: |
@@ -185,6 +181,40 @@ jobs:
           fi
           grep -q "saved data requires an explicit avatar" "$RUNNER_TEMP/reject.log"
           test ! -e "$EB_OUTPUT"
+
+      - uses: ./
+        id: different-contributor
+        with:
+          repository: EffortlessSteven/e-balls
+          ref: 2ac0374373eff3cf60c201565d7137c0ccedcbe8
+          project: release-balls
+          since: 7d
+          end: '2026-09-29'
+          format: gif
+          output: ${{ runner.temp }}/e-balls-maria-week
+      - name: Confirm an unrelated repository history selects Maria, not Steven
+        env:
+          BALLS_DIRECTORY: ${{ steps.different-contributor.outputs.directory }}
+          BALLS_DATA: ${{ steps.different-contributor.outputs.data }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          directory=Path(os.environ['BALLS_DIRECTORY'])
+          source=json.loads(Path(os.environ['BALLS_DATA']).read_text())['source']
+          top=source['top_contributor']
+          assert source['repository']=='EffortlessSteven/e-balls'
+          assert top['login']=='maria-rcks', top
+          assert top['id']!=15812269
+          assert top['sample_commit'] in {receipt['sha'] for receipt in source['commits']}
+          assert hashlib.sha256((directory/'avatar.png').read_bytes()).hexdigest()==top['avatar_sha256']
+          assert (directory/'avatar.png').read_bytes() != Path('examples/perl-lsp-2026-10-04-teal/avatar.png').read_bytes()
+          assert source['total_commits'] > 0
+          print(json.dumps({'winner':top['login'],'author_commits':top['authored_commits'],'counted_letters':top['counted_letters']},sort_keys=True))
+          PY
+          ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.gif" -f null -
       - uses: actions/upload-artifact@v4
         if: always()
         with:
