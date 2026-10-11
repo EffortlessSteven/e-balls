@@ -71,7 +71,7 @@ All outputs are paths on the runner.
 | `directory` | All generated files, including GIF and/or MP4. |
 | `markdown` | `embed.md`, with links to the rendered media. |
 | `manifest` | `manifest.json` with the counts and generated files. |
-| `data` | `data.json`, a snapshot of the counted commit messages. |
+| `data` | `data.json`, with daily counts and per-commit receipts. |
 
 To use the files in another job, upload `directory` as an artifact.
 
