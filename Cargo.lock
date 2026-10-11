@@ -976,6 +976,7 @@ dependencies = [
  "image",
  "regex",
  "reqwest",
+ "ring",
  "rustix",
  "serde",
  "serde_json",
