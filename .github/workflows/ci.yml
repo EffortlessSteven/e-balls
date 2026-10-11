@@ -3,19 +3,67 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   check:
+    if: github.repository == 'EffortlessSteven/e-balls'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.88
         with:
           components: rustfmt, clippy
-      - run: pkg-config --exists freetype2 || (sudo apt-get update -qq && sudo apt-get install -y -qq libfreetype6-dev pkg-config)
-      - run: cargo fmt --check
-      - run: cargo clippy --release --locked -- -D warnings
-      - run: cargo build --release --locked
+      - name: Native dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libfreetype6-dev pkg-config ffmpeg
+      - run: cargo build --release --locked --bins
+      - run: cargo test --locked --all-targets
+      - run: cargo clippy --release --locked --all-targets -- -D warnings
+      - name: Git collector and actual CLI/media tests
+        env:
+          EBALLS_BIN: target/release/e-balls
+        run: python3 -m unittest discover -s tests -v
+      - name: Render the pinned perl-lsp example
+        run: |
+          git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
+            https://github.com/EffortlessMetrics/perl-lsp-swarm.git "$RUNNER_TEMP/perl-lsp.git"
+          git -C "$RUNNER_TEMP/perl-lsp.git" config remote.origin.pushurl DISABLED
+          python3 scripts/count_letters.py \
+            --repo "$RUNNER_TEMP/perl-lsp.git" \
+            --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
+            --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
+            --start 2026-10-04 --end 2026-10-11 --out "$RUNNER_TEMP/e-counts.json"
+          python3 scripts/verify_counts.py --repo "$RUNNER_TEMP/perl-lsp.git" \
+            --data "$RUNNER_TEMP/e-counts.json" > "$RUNNER_TEMP/count-verification.json"
+          curl --fail --location --retry 3 --max-time 60 \
+            'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
+            --output "$RUNNER_TEMP/steven.png"
+          ./target/release/e-balls --data "$RUNNER_TEMP/e-counts.json" \
+            --avatar "$RUNNER_TEMP/steven.png" --format both --out out
+          cp "$RUNNER_TEMP/count-verification.json" out/count-verification.json
+          ffmpeg -v error -xerror -i out/e-balls.mp4 -f null -
+          ffmpeg -v error -xerror -i out/e-balls.gif -f null -
+          ffprobe -v error -show_streams -show_format -of json out/e-balls.mp4 > out/mp4-probe.json
+          ffprobe -v error -show_streams -show_format -of json out/e-balls.gif > out/gif-probe.json
+          ffmpeg -v error -ss 0.5 -i out/e-balls.mp4 -frames:v 1 out/preview.png
+          printf '%s\n' "$GITHUB_SHA" > out/renderer-commit.txt
+          (cd out && sha256sum data.json avatar.png manifest.json e-balls.mp4 e-balls.gif > SHA256SUMS)
+          cat out/count-verification.json
+      - name: Rust formatting
+        run: cargo fmt --all -- --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e-balls-perl-lsp
+          path: out/
+          if-no-files-found: ignore
+          retention-days: 30
+          compression-level: 0
