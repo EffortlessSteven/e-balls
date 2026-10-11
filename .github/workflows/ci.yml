@@ -58,14 +58,11 @@ jobs:
             --repo "$RUNNER_TEMP/perl-lsp.git" \
             --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
             --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
-            --start 2026-10-04 --end 2026-10-11 --out "$RUNNER_TEMP/e-counts.json"
+            --since 7d --end 2026-10-11 --out "$RUNNER_TEMP/e-counts.json"
           python3 scripts/verify_counts.py --repo "$RUNNER_TEMP/perl-lsp.git" \
             --data "$RUNNER_TEMP/e-counts.json" | tee verification/count-verification.json
-          curl --fail --location --retry 3 --max-time 60 \
-            'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
-            --output "$RUNNER_TEMP/steven.png"
           ./target/release/e-balls --data "$RUNNER_TEMP/e-counts.json" \
-            --avatar "$RUNNER_TEMP/steven.png" --format both --out out
+            --avatar examples/perl-lsp-2026-10-04/avatar.png --format both --out out
           cp verification/count-verification.json out/count-verification.json
           ffmpeg -v error -xerror -i out/e-balls.mp4 -f null -
           ffmpeg -v error -xerror -i out/e-balls.gif -f null -

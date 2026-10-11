@@ -1,0 +1,86 @@
+{
+  "avatar": "avatar.png",
+  "avatar_policy": "same supplied image on every row",
+  "duration_seconds": 16.0,
+  "files": [
+    {
+      "fps": 60,
+      "path": "e-balls.mp4",
+      "width": 1080
+    },
+    {
+      "fps": 15,
+      "path": "e-balls.gif",
+      "width": 480
+    }
+  ],
+  "renderer": "e-balls",
+  "row_order": "input",
+  "rows": [
+    [
+      "Sun Oct 04",
+      5773
+    ],
+    [
+      "Mon Oct 05",
+      5691
+    ],
+    [
+      "Tue Oct 06",
+      3809
+    ],
+    [
+      "Wed Oct 07",
+      3292
+    ],
+    [
+      "Thu Oct 08",
+      109
+    ],
+    [
+      "Fri Oct 09",
+      4
+    ],
+    [
+      "Sat Oct 10",
+      734
+    ]
+  ],
+  "schema_version": 1,
+  "source_data": "data.json",
+  "speed": "linear count / maximum; fastest crosses in 1 second",
+  "theme": {
+    "background": "#f5f1e8",
+    "data_font": "IBM Plex Mono Regular",
+    "font_sources": {
+      "files": [
+        {
+          "path": "IBMPlexSans-Regular.ttf",
+          "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
+          "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/fonts/complete/ttf/IBMPlexSans-Regular.ttf"
+        },
+        {
+          "path": "IBMPlexSans-LICENSE.txt",
+          "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+          "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-sans/LICENSE.txt"
+        },
+        {
+          "path": "IBMPlexMono-Regular.ttf",
+          "sha256": "7c6fbddca4b700be918f5f6183d9bd4464fa427fe435f0b480d77fe2bb8c5a43",
+          "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/fonts/complete/ttf/IBMPlexMono-Regular.ttf"
+        },
+        {
+          "path": "IBMPlexMono-LICENSE.txt",
+          "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+          "source": "https://raw.githubusercontent.com/IBM/plex/763c36ef9117782905ae010056dfbe8fd2653a25/packages/plex-mono/LICENSE.txt"
+        }
+      ],
+      "license": "OFL-1.1",
+      "repository": "https://github.com/IBM/plex",
+      "revision": "763c36ef9117782905ae010056dfbe8fd2653a25"
+    },
+    "foreground": "#156b76",
+    "name": "teal-cream",
+    "primary_font": "IBM Plex Sans Regular"
+  }
+}

@@ -5,11 +5,11 @@
 Occurrences of `E` in [perl-lsp](https://github.com/EffortlessMetrics/perl-lsp)
 (and [perl-lsp-swarm](https://github.com/EffortlessMetrics/perl-lsp-swarm)) commit messages in the past week.
 
-![Occurrences of E in perl-lsp commit messages in the past week](examples/perl-lsp-2026-10-04/e-balls.gif)
+![Occurrences of E in perl-lsp commit messages in the past week](examples/perl-lsp-2026-10-04-teal/e-balls.gif)
 
 *Top 7 perl-lsp days in the past week, rendered with `since: 7d`.*
 
-October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04/e-balls.mp4).
+October 4–10, 2026 (UTC). [MP4](examples/perl-lsp-2026-10-04-teal/e-balls.mp4).
 
 ## Quick start
 
@@ -27,13 +27,12 @@ python3 scripts/count_letters.py \
   --repo ../perl-lsp-history.git \
   --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
   --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
-  --start 2026-10-04 --end 2026-10-11 --out e-counts.json
+  --since 7d --end 2026-10-11 --out e-counts.json
 
 # Independently recount the frozen snapshot from individual Git objects.
 python3 scripts/verify_counts.py --repo ../perl-lsp-history.git --data e-counts.json
 
-curl --fail --location 'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
-  --output steven.png
+cp examples/perl-lsp-2026-10-04/avatar.png steven.png
 
 ./target/release/e-balls --data e-counts.json --avatar steven.png --out out
 ```
@@ -47,9 +46,10 @@ Rendering is offline. It does not look up avatars from row labels. An unreadable
 portrait is an error, not permission to replace your head with initials.
 
 To measure the last seven **completed UTC days**, replace the pinned `--ref`
-with the source's current branch and omit `--start` and `--end`. The collector
+with the source's current branch, keep `--since 7d`, and omit `--end`. The collector
 records the resolved commit SHA before reading. `--days`, `--end`, and
-`--letter` select other windows or ASCII letters.
+`--letter` select other windows or ASCII letters. `--since 7d` conflicts with
+explicit `--days` or `--start`.
 
 ## What gets counted
 

@@ -1,0 +1,17 @@
+{
+  "command": [
+    "python3",
+    "scripts/verify_counts.py",
+    "--repo",
+    "/tmp/e-balls-perl-history.git",
+    "--data",
+    "/tmp/e-balls-counts.json"
+  ],
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "revision": "c1425299af74ba21afd58832d85b2d0b67dc1c28",
+  "inputs": "inputs-a089e96692224af83bb11d23e33720e8d5571d84ebff2897b06efc09d1142b46.json",
+  "started": "2026-10-11T22:49:51.761876+00:00",
+  "environment": "mise Rust 1.88.0 / Python 3.12.15; FFmpeg 7.0.2 static libx264; system FreeType 26.1.20 pkg-config; synthetic CLI fixtures; real source pinned separately",
+  "exit_code": 0,
+  "result": "passed"
+}

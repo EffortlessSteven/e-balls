@@ -1,0 +1,11 @@
+{
+  "verified": true,
+  "renderer_base": "c1425299af74ba21afd58832d85b2d0b67dc1c28",
+  "old_example_files_preserved": 83,
+  "readme_opening_caption_and_logo_placement_preserved": true,
+  "official_font_hashes_match": true,
+  "logo_original_circle_geometry_and_outlined_e": true,
+  "source_history_shallow": false,
+  "source_repository": "https://github.com/EffortlessMetrics/perl-lsp-swarm.git",
+  "source_pin": "31b87ee79b8fb55b6433bed7c1f1e4478443d61e"
+}

@@ -1,0 +1,15 @@
+{
+  "command": [
+    "cargo",
+    "test",
+    "--locked",
+    "--all-targets"
+  ],
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "revision": "c1425299af74ba21afd58832d85b2d0b67dc1c28",
+  "inputs": "inputs-4ff8106de00b3f695018beff5c17fcf51147a6996122837c012ef66a098bfccc.json",
+  "started": "2026-10-11T22:50:14.089308+00:00",
+  "environment": "mise Rust 1.88.0 / Python 3.12.15; FFmpeg 7.0.2 static libx264; system FreeType 26.1.20 pkg-config; synthetic CLI fixtures; real source pinned separately",
+  "exit_code": 0,
+  "result": "passed"
+}
