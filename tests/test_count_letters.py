@@ -11,6 +11,12 @@ spec = importlib.util.spec_from_file_location("count_letters", ROOT / "scripts/c
 assert spec and spec.loader
 counter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(counter)
+
+spec_verify = importlib.util.spec_from_file_location("verify_counts", ROOT / "scripts/verify_counts.py")
+assert spec_verify and spec_verify.loader
+verifier = importlib.util.module_from_spec(spec_verify)
+spec_verify.loader.exec_module(verifier)
+
 START, END = dt.date(2026, 10, 4), dt.date(2026, 10, 11)
 
 
@@ -141,6 +147,34 @@ class CounterTests(unittest.TestCase):
         ], capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(json.loads(output.read_text())["source"]["total_count"], 2)
+
+    def test_independent_verifier_reconciles_raw_objects(self):
+        a = self.commit(b"eE\n\nbody e")
+        self.commit(b"e", parents=(a,))
+        path = Path(self.tmp.name) / "data.json"
+        counter.write_json(path, self.collect())
+        result = verifier.verify(self.repo, path)
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["commits"], 2)
+        self.assertEqual(result["count"], 4)
+
+    def test_independent_verifier_rejects_forged_daily_counts(self):
+        self.commit(b"eE")
+        path = Path(self.tmp.name) / "data.json"
+        data = self.collect()
+        data["rows"][1]["count"] += 1
+        counter.write_json(path, data)
+        with self.assertRaisesRegex(ValueError, "daily count mismatch"):
+            verifier.verify(self.repo, path)
+
+    def test_independent_verifier_rejects_missing_calendar_days(self):
+        self.commit(b"eE")
+        path = Path(self.tmp.name) / "data.json"
+        data = self.collect()
+        del data["rows"][3]
+        counter.write_json(path, data)
+        with self.assertRaisesRegex(ValueError, "calendar rows"):
+            verifier.verify(self.repo, path)
 
 
 if __name__ == "__main__":
