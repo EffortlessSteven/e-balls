@@ -110,10 +110,13 @@ jobs:
       - uses: ./
         id: balls
         with:
-          data: examples/perl-lsp-2026-10-04-teal/data.json
+          repository: EffortlessMetrics/perl-lsp-swarm
+          ref: main
+          since: 7d
+          end: '2026-10-11'
           format: both
-          output: ${{ runner.temp }}/e-balls-action-smoke
-      - name: Verify Action outputs and playable media
+          output: ${{ runner.temp }}/e-balls-action-live
+      - name: Verify live counts, Action outputs and playable media
         shell: bash
         env:
           BALLS_DIRECTORY: ${{ steps.balls.outputs.directory }}
@@ -124,6 +127,7 @@ jobs:
           set -euo pipefail
           test -f "$BALLS_DIRECTORY/e-balls.mp4"
           test -f "$BALLS_DIRECTORY/e-balls.gif"
+          test -f "$BALLS_DIRECTORY/count-verification.json"
           test -f "$BALLS_MANIFEST"
           test -f "$BALLS_DATA"
           test -f "$BALLS_MARKDOWN"
@@ -135,8 +139,14 @@ jobs:
           directory = Path(os.environ['BALLS_DIRECTORY'])
           data = json.loads(Path(os.environ['BALLS_DATA']).read_text())
           manifest = json.loads(Path(os.environ['BALLS_MANIFEST']).read_text())
+          verification = json.loads((directory / 'count-verification.json').read_text())
+          assert verification['verified'] is True
+          assert data['source']['repository'] == 'EffortlessMetrics/perl-lsp-swarm'
+          assert data['source']['end_exclusive'] == '2026-10-11T00:00:00Z'
+          assert len(data['rows']) == 7
+          assert verification['daily_counts'] == {row['date']: row['count'] for row in data['rows']}
+          assert verification['source_commit'] == data['source']['commit']
           assert manifest['rows'] == [[row['label'], row['count']] for row in data['rows']]
-          assert [row['count'] for row in data['rows']] == [5773, 5691, 3809, 3292, 109, 4, 734]
           assert 'e-balls.gif' in Path(os.environ['BALLS_MARKDOWN']).read_text()
           assert 'e-balls.mp4' in Path(os.environ['BALLS_MARKDOWN']).read_text()
           assert (directory / 'avatar.png').is_file()
