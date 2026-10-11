@@ -3,6 +3,8 @@
 Occurrences of the letter `e` in perl-lsp commit messages, per day.
 Same head on every ball.
 
+![Seven days of perl-lsp letter counts, with Steven's portrait on every ball](examples/perl-lsp-2026-10-04/e-balls.gif)
+
 A fork of [Maria's Release Balls](https://github.com/maria-rcks/release-balls).
 The bouncing animation, circular portraits, white canvas, and FFmpeg exports
 are retained. The rows are days instead of contributors, and the counts are
