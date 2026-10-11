@@ -52,7 +52,10 @@ else
   work=$(mktemp -d "$RUNNER_TEMP/e-balls-source.XXXXXXXX")
   clone_args=(--bare --filter=blob:none --single-branch --no-tags)
   source_ref=HEAD
-  if [[ -n "$EB_REF" ]]; then
+  if [[ "$EB_REF" =~ ^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$ ]]; then
+    # A full reachable SHA makes the weekly replay reproducible.
+    source_ref="$EB_REF"
+  elif [[ -n "$EB_REF" ]]; then
     git check-ref-format --branch "$EB_REF" >/dev/null
     clone_args+=(--branch "$EB_REF")
     source_ref="$EB_REF"
