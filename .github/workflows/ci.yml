@@ -2,21 +2,33 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, feat/e-balls]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: e-balls-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     if: github.repository == 'EffortlessSteven/e-balls'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Record the checkout being tested
+        run: |
+          mkdir -p verification
+          git rev-parse HEAD | tee verification/renderer-commit.txt
+          git status --porcelain=v1 > verification/initial-status.txt
       - uses: dtolnay/rust-toolchain@1.88
         with:
           components: rustfmt, clippy
@@ -24,13 +36,19 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libfreetype6-dev pkg-config ffmpeg
-      - run: cargo build --release --locked --bins
-      - run: cargo test --locked --all-targets
-      - run: cargo clippy --release --locked --all-targets -- -D warnings
+          rustc --version | tee verification/toolchain.txt
+          cargo --version | tee -a verification/toolchain.txt
+          ffmpeg -version | head -n 1 | tee -a verification/toolchain.txt
+      - name: Build both binaries
+        run: cargo build --release --locked --bins 2>&1 | tee verification/build.log
+      - name: Rust tests
+        run: cargo test --locked --all-targets 2>&1 | tee verification/rust-tests.log
+      - name: Clippy
+        run: cargo clippy --release --locked --all-targets -- -D warnings 2>&1 | tee verification/clippy.log
       - name: Git collector and actual CLI/media tests
         env:
           EBALLS_BIN: target/release/e-balls
-        run: python3 -m unittest discover -s tests -v
+        run: python3 -m unittest discover -s tests -v 2>&1 | tee verification/python-tests.log
       - name: Render the pinned perl-lsp example
         run: |
           git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
@@ -42,27 +60,43 @@ jobs:
             --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
             --start 2026-10-04 --end 2026-10-11 --out "$RUNNER_TEMP/e-counts.json"
           python3 scripts/verify_counts.py --repo "$RUNNER_TEMP/perl-lsp.git" \
-            --data "$RUNNER_TEMP/e-counts.json" > "$RUNNER_TEMP/count-verification.json"
+            --data "$RUNNER_TEMP/e-counts.json" | tee verification/count-verification.json
           curl --fail --location --retry 3 --max-time 60 \
             'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
             --output "$RUNNER_TEMP/steven.png"
           ./target/release/e-balls --data "$RUNNER_TEMP/e-counts.json" \
             --avatar "$RUNNER_TEMP/steven.png" --format both --out out
-          cp "$RUNNER_TEMP/count-verification.json" out/count-verification.json
+          cp verification/count-verification.json out/count-verification.json
           ffmpeg -v error -xerror -i out/e-balls.mp4 -f null -
           ffmpeg -v error -xerror -i out/e-balls.gif -f null -
           ffprobe -v error -show_streams -show_format -of json out/e-balls.mp4 > out/mp4-probe.json
           ffprobe -v error -show_streams -show_format -of json out/e-balls.gif > out/gif-probe.json
           ffmpeg -v error -ss 0.5 -i out/e-balls.mp4 -frames:v 1 out/preview.png
-          printf '%s\n' "$GITHUB_SHA" > out/renderer-commit.txt
+          cp verification/renderer-commit.txt out/renderer-commit.txt
           (cd out && sha256sum data.json avatar.png manifest.json e-balls.mp4 e-balls.gif > SHA256SUMS)
-          cat out/count-verification.json
       - name: Rust formatting
-        run: cargo fmt --all -- --check
+        if: always()
+        run: cargo fmt --all -- --check 2>&1 | tee verification/rustfmt.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: e-balls-perl-lsp
+          name: e-balls-verification-${{ github.event_name }}
+          path: verification/
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e-balls-binaries-${{ github.event_name }}
+          path: |
+            target/release/e-balls
+            target/release/release-balls
+          if-no-files-found: ignore
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e-balls-perl-lsp-${{ github.event_name }}
           path: out/
           if-no-files-found: ignore
           retention-days: 30
