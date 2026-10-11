@@ -8,6 +8,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::Arc;
 use std::time::Duration;
 
 pub struct Options {
@@ -17,6 +18,17 @@ pub struct Options {
     pub preset: String,
     pub threads: u32,
     pub strategy: String,
+}
+
+/// Labels are independent of avatar identity. A supplied image is reused for
+/// every row; no avatar requests or fallback initials are used in that mode.
+pub struct Presentation<'a> {
+    pub title: &'a str,
+    pub subtitle: &'a str,
+    pub footer: &'a str,
+    pub singular: &'a str,
+    pub plural: &'a str,
+    pub avatar: Option<&'a RgbImage>,
 }
 
 struct Glyph {
@@ -194,8 +206,9 @@ fn fallback_avatar(login: &str, library: &Library) -> Result<RgbImage> {
     Ok(image)
 }
 
+#[derive(Clone)]
 struct Sprite {
-    pixels: Vec<u8>,
+    pixels: Arc<[u8]>,
     diameter: usize,
     y: i32,
     radius: i32,
@@ -233,7 +246,7 @@ fn sprite(source: &RgbImage, radius: i32, y: i32, count: u64) -> Sprite {
         }
     }
     Sprite {
-        pixels: ball.into_raw(),
+        pixels: ball.into_raw().into(),
         diameter: diameter as usize,
         y,
         radius,
@@ -256,27 +269,18 @@ fn grouped_number(value: u64) -> String {
 }
 
 fn artwork(
-    repo: &str,
-    subtitle: &str,
     rows: &[(String, u64)],
-    metric: &str,
+    presentation: &Presentation<'_>,
     width: u32,
 ) -> Result<(Vec<u8>, Vec<Sprite>)> {
     let library = Library::init()?;
     let scale = f64::from(width) * 2.0 / 1080.0;
     let n = |value: f64| rounded(value * scale);
     let mut canvas = RgbImage::from_pixel(width * 2, width * 2, Rgb([255; 3]));
-    let title = format!(
-        "{} {subtitle}",
-        if metric == "changes" {
-            "Lines changed"
-        } else {
-            "Pull requests merged"
-        }
-    );
+    let title = presentation.title;
     let mut title_size = n(48.0) as u32;
     let title = loop {
-        let shaped = text(&font(&library, title_size)?, &title)?;
+        let shaped = text(&font(&library, title_size)?, title)?;
         if shaped.advance <= f64::from(n(1000.0)) || title_size <= 1 {
             break shaped;
         }
@@ -288,13 +292,22 @@ fn artwork(
         n(80.0),
         0,
     );
-    let watermark = text(
-        &font(&library, n(22.0) as u32)?,
-        &format!("github.com/{repo}"),
-    )?;
+    let mut title_bottom = n(80.0) + title.bounds[3];
+    if !presentation.subtitle.is_empty() {
+        let subtitle = fit_text(&library, presentation.subtitle, n(28.0) as u32, n(1000.0))?;
+        let y = title_bottom + n(14.0) - subtitle.bounds[1];
+        subtitle.draw(
+            &mut canvas,
+            (f64::from(width * 2) - subtitle.advance) / 2.0,
+            y,
+            100,
+        );
+        title_bottom = y + subtitle.bounds[3];
+    }
+    let watermark = fit_text(&library, presentation.footer, n(22.0) as u32, n(1000.0))?;
     let watermark_y = (width * 2) as i32 - n(36.0) - watermark.bounds[3];
     let watermark_top = watermark_y + watermark.bounds[1];
-    let center = f64::from(n(80.0) + title.bounds[3] + watermark_top) / (2.0 * scale);
+    let center = f64::from(title_bottom + watermark_top) / (2.0 * scale);
     watermark.draw(
         &mut canvas,
         f64::from(width * 2) - f64::from(n(36.0)) - watermark.advance.round(),
@@ -350,33 +363,61 @@ fn artwork(
     } else {
         (500.0 + (layout_rows - 3) as f64 * 28.0) / (layout_rows - 1) as f64
     };
-    let client = Client::builder()
-        .user_agent("release-balls")
-        .timeout(Duration::from_secs(15))
-        .build()?;
+    let radius =
+        rounded((76.0 * text_scale).min(row_height * 0.4) * f64::from(width) / 1080.0).max(1);
+    // Keep dense sprite rectangles separated after pixel rounding,
+    // including their YUV chroma cells.
+    let radius = if rows.len() > 12 {
+        radius
+            .min(((row_height * f64::from(width) / 1080.0 - 1.0) / 2.0).floor() as i32)
+            .max(1)
+    } else {
+        radius
+    };
+    let shared_avatar = presentation.avatar.map(|image| sprite(image, radius, 0, 0));
+    let client = if presentation.avatar.is_none() {
+        Some(
+            Client::builder()
+                .user_agent("release-balls")
+                .timeout(Duration::from_secs(15))
+                .build()?,
+        )
+    } else {
+        None
+    };
     let name_bottom = text(&name_font, "Ag")?.bounds[3];
     let mut sprites = Vec::with_capacity(rows.len());
     // Bound avatar download concurrency and decoded-image memory even for
     // thousands of contributors. Only the small rendered sprites persist.
     for (batch, chunk) in rows.chunks(8).enumerate() {
-        let sources: Vec<Result<RgbImage>> = std::thread::scope(|scope| {
-            let handles: Vec<_> = chunk
-                .iter()
-                .map(|(login, _)| {
-                    let client = &client;
-                    scope.spawn(move || avatar(login, client))
-                })
-                .collect();
-            handles
-                .into_iter()
-                .map(|handle| {
-                    handle
-                        .join()
-                        .unwrap_or_else(|_| Err(anyhow::anyhow!("avatar download panicked")))
-                })
-                .collect()
-        });
-        for (offset, ((login, count), source)) in chunk.iter().zip(sources).enumerate() {
+        let balls: Vec<Result<Sprite>> = if let Some(ball) = &shared_avatar {
+            chunk.iter().map(|_| Ok(ball.clone())).collect()
+        } else {
+            std::thread::scope(|scope| {
+                let handles: Vec<_> = chunk
+                    .iter()
+                    .map(|(login, _)| {
+                        let client = &client;
+                        scope.spawn(move || {
+                            let image = avatar(
+                                login,
+                                client.as_ref().context("avatar client unavailable")?,
+                            )?;
+                            Ok(sprite(&image, radius, 0, 0))
+                        })
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|handle| {
+                        handle
+                            .join()
+                            .unwrap_or_else(|_| Err(anyhow::anyhow!("avatar download panicked")))
+                    })
+                    .collect()
+            })
+        };
+        for (offset, ((login, count), ball)) in chunk.iter().zip(balls).enumerate() {
             let index = batch * 8 + offset;
             let column = index / layout_rows;
             let column_start = column * layout_rows;
@@ -385,18 +426,6 @@ fn artwork(
             let cell_x = 70.0 + column as f64 * 940.0 / columns as f64;
 
             let y = center + (row as f64 - (column_rows as f64 - 1.0) / 2.0) * row_height;
-            let radius =
-                rounded((76.0 * text_scale).min(row_height * 0.4) * f64::from(width) / 1080.0)
-                    .max(1);
-            // Keep dense sprite rectangles separated after pixel rounding,
-            // including their YUV chroma cells.
-            let radius = if rows.len() > 12 {
-                radius
-                    .min(((row_height * f64::from(width) / 1080.0 - 1.0) / 2.0).floor() as i32)
-                    .max(1)
-            } else {
-                radius
-            };
             names[index].draw(
                 &mut canvas,
                 f64::from(n(cell_x)),
@@ -408,11 +437,10 @@ fn artwork(
                 &format!(
                     "{} {}",
                     grouped_number(*count),
-                    match (metric == "changes", *count == 1) {
-                        (true, true) => "line",
-                        (true, false) => "lines",
-                        (false, true) => "merge",
-                        (false, false) => "merges",
+                    if *count == 1 {
+                        presentation.singular
+                    } else {
+                        presentation.plural
                     }
                 ),
             )?;
@@ -423,16 +451,12 @@ fn artwork(
                     - count_text.bounds[1],
                 0,
             );
-            let source = match source {
-                Ok(image) => image,
-                Err(_) => fallback_avatar(login, &library)?,
+            let mut ball = match ball {
+                Ok(ball) => ball,
+                Err(_) => sprite(&fallback_avatar(login, &library)?, radius, 0, 0),
             };
-            let mut ball = sprite(
-                &source,
-                radius,
-                rounded(y * f64::from(width) / 1080.0),
-                *count,
-            );
+            ball.y = rounded(y * f64::from(width) / 1080.0);
+            ball.count = *count;
             let (left, right) = if rows.len() <= 12 {
                 ((70.0 + label_width + 24.0 + 76.0).max(350.0), 980.0)
             } else {
@@ -727,10 +751,53 @@ pub fn render(
     formats: &[&str],
     options: &Options,
 ) -> Result<Vec<String>> {
-    if options.width < 2
-        || options.fps == 0
+    let title = format!(
+        "{} {subtitle}",
+        if metric == "changes" {
+            "Lines changed"
+        } else {
+            "Pull requests merged"
+        }
+    );
+    let footer = format!("github.com/{repo}");
+    let presentation = Presentation {
+        title: &title,
+        subtitle: "",
+        footer: &footer,
+        singular: if metric == "changes" {
+            "line"
+        } else {
+            "merge"
+        },
+        plural: if metric == "changes" {
+            "lines"
+        } else {
+            "merges"
+        },
+        avatar: None,
+    };
+    render_with(rows, &presentation, output, formats, options)
+}
+
+/// Render arbitrary counts in input order using the same Release Balls engine.
+pub fn render_with(
+    rows: &[(String, u64)],
+    presentation: &Presentation<'_>,
+    output: &Path,
+    formats: &[&str],
+    options: &Options,
+) -> Result<Vec<String>> {
+    if !(320..=2160).contains(&options.width)
+        || !options.width.is_multiple_of(2)
+        || !(1..=60).contains(&options.fps)
         || !options.duration.is_finite()
-        || options.duration <= 0.0
+        || !(0.1..=60.0).contains(&options.duration)
+        || !(1..=16).contains(&options.threads)
+        || !matches!(options.strategy.as_str(), "yuv" | "dirty" | "cached")
+        || !matches!(
+            options.preset.as_str(),
+            "ultrafast" | "superfast" | "veryfast"
+        )
     {
         bail!("invalid render dimensions or timing");
     }
@@ -745,7 +812,13 @@ pub fn render(
     if yuv && !options.width.is_multiple_of(2) {
         bail!("YUV420 requires an even width");
     }
-    let (background, sprites) = artwork(repo, subtitle, rows, metric, options.width)?;
+    if presentation
+        .avatar
+        .is_some_and(|image| image.width() == 0 || image.height() == 0)
+    {
+        bail!("avatar must not be empty");
+    }
+    let (background, sprites) = artwork(rows, presentation, options.width)?;
     let yuv_sprites: Vec<_> = if yuv {
         sprites.iter().map(YuvSprite::new).collect()
     } else {
@@ -869,17 +942,14 @@ pub fn render(
         }
         previous.clear();
         for (index, sprite) in sprites.iter().enumerate() {
-            let span = sprite.span;
-            let distance =
-                f64::from(span) * (sprite.count as f64 / maximum as f64) * f64::from(frame)
-                    / f64::from(options.fps);
-            let phase = distance % f64::from(2 * span);
-            let x = sprite.left
-                + rounded(if phase <= f64::from(span) {
-                    phase
-                } else {
-                    f64::from(2 * span) - phase
-                });
+            let x = ball_x(
+                sprite.left,
+                sprite.span,
+                sprite.count,
+                maximum,
+                frame,
+                options.fps,
+            );
             let x = x - sprite.radius;
             let y = sprite.y - sprite.radius;
             if yuv {
@@ -923,4 +993,86 @@ pub fn render(
         .iter()
         .map(|format| format!("{stem}.{format}"))
         .collect())
+}
+
+fn fit_text(library: &Library, value: &str, initial_size: u32, width: i32) -> Result<Text> {
+    let mut size = initial_size.max(1);
+    loop {
+        let shaped = text(&font(library, size)?, value)?;
+        if shaped.advance <= f64::from(width) || size == 1 {
+            return Ok(shaped);
+        }
+        size -= 1;
+    }
+}
+
+// Same linear speed and triangular bounce as upstream. A zero count stays put.
+fn ball_x(left: i32, span: i32, count: u64, maximum: u64, frame: i32, fps: u32) -> i32 {
+    let distance = f64::from(span) * (count as f64 / maximum.max(1) as f64) * f64::from(frame)
+        / f64::from(fps);
+    let phase = distance % f64::from(2 * span);
+    left + rounded(if phase <= f64::from(span) {
+        phase
+    } else {
+        f64::from(2 * span) - phase
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn speeds_are_linear_and_zero_stays_still() {
+        assert_eq!(ball_x(100, 600, 10, 10, 30, 60), 400);
+        assert_eq!(ball_x(100, 600, 5, 10, 30, 60), 250);
+        assert_eq!(ball_x(100, 600, 10, 10, 60, 60), 700);
+        assert_eq!(ball_x(100, 600, 10, 10, 120, 60), 100);
+        assert_eq!(ball_x(100, 600, 0, 0, 960, 60), 100);
+    }
+
+    #[test]
+    fn fixed_portraits_and_row_order_survive_layout() -> Result<()> {
+        let image = RgbImage::from_pixel(64, 64, Rgb([41, 89, 137]));
+        let presentation = Presentation {
+            title: "Occurrences of 'e' in perl-lsp commit messages",
+            subtitle: "2026-10-04 to 2026-10-10 · UTC",
+            footer: "github.com/EffortlessMetrics/perl-lsp-swarm",
+            singular: "e",
+            plural: "e's",
+            avatar: Some(&image),
+        };
+        let rows: Vec<_> = [5773, 5691, 3809, 3292, 109, 4, 734]
+            .into_iter()
+            .enumerate()
+            .map(|(day, count)| (format!("Day {day}"), count))
+            .collect();
+        for width in [320, 480, 1080] {
+            let (_, sprites) = artwork(&rows, &presentation, width)?;
+            assert_eq!(sprites.len(), 7);
+            assert_eq!(
+                sprites.iter().map(|s| s.count).collect::<Vec<_>>(),
+                rows.iter().map(|r| r.1).collect::<Vec<_>>()
+            );
+            for sprite in &sprites {
+                assert_eq!(sprite.pixels, sprites[0].pixels);
+                assert!(Arc::ptr_eq(&sprite.pixels, &sprites[0].pixels));
+                assert!(sprite.y - sprite.radius >= 0);
+                assert!(sprite.y + sprite.radius < width as i32);
+                for frame in 0..960 {
+                    let x = ball_x(sprite.left, sprite.span, sprite.count, 5773, frame, 60);
+                    assert!(x - sprite.radius >= 0);
+                    assert!(x + sprite.radius < width as i32);
+                }
+            }
+        }
+        let dense_rows: Vec<_> = rows.iter().chain(&rows).cloned().collect();
+        let (_, sprites) = artwork(&dense_rows, &presentation, 320)?;
+        assert_eq!(sprites.len(), dense_rows.len());
+        for (sprite, (_, count)) in sprites.iter().zip(&dense_rows) {
+            assert!(Arc::ptr_eq(&sprite.pixels, &sprites[0].pixels));
+            assert_eq!(sprite.count, *count);
+        }
+        Ok(())
+    }
 }

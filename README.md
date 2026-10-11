@@ -1,114 +1,114 @@
-<img src="assets/logo.svg" alt="" width="96" align="right">
+# e-balls
 
-# Release Balls
+Occurrences of the letter `e` in perl-lsp commit messages, per day.
+Same head on every ball.
 
-A GitHub Action that turns a release into a short race between the people who shipped it. Each contributor is a ball with their avatar; the more merged PRs they have, the faster they go. You get a GIF, an MP4, and the rankings as JSON.
+A fork of [Maria's Release Balls](https://github.com/maria-rcks/release-balls).
+The bouncing animation, circular portraits, white canvas, and FFmpeg exports
+are retained. The rows are days instead of contributors, and the counts are
+letters instead of pull requests.
 
-![Top 10 t3code PR authors in the past week](assets/demo.gif)
+## Make the clip
 
-*Top 10 [t3code](https://github.com/pingdotgg/t3code) PR authors in the past week, rendered with `since: 7d`.*
+Requires Rust 1.88+, Python 3.10+, Git, FFmpeg, and FreeType headers
+(`libfreetype6-dev` and `pkg-config` on Ubuntu).
 
-## Quick start
+```sh
+cargo build --release --locked --bins
 
-Copy [examples/release.yml](examples/release.yml) to `.github/workflows/release-balls.yml` and publish a release. The workflow:
+# Use an existing full checkout, or fetch commit history without file blobs.
+git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
+  https://github.com/EffortlessMetrics/perl-lsp-swarm.git ../perl-lsp-history.git
 
-1. Ranks the PR authors in the release that triggered it.
-2. Attaches the GIF and MP4 to that release.
-3. Appends the GIF and a video link to the release notes, leaving your notes intact.
+python3 scripts/count_letters.py \
+  --repo ../perl-lsp-history.git \
+  --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e \
+  --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp \
+  --start 2026-10-04 --end 2026-10-11 --out e-counts.json
 
-Rerunning it replaces the same assets and the same notes section.
+# Independently recount the frozen snapshot from individual Git objects.
+python3 scripts/verify_counts.py --repo ../perl-lsp-history.git --data e-counts.json
 
-The first run on a new version builds the Rust binary, which takes about 3 minutes. Later runs reuse the cached binary.
+curl --fail --location 'https://avatars.githubusercontent.com/u/15812269?v=4&s=512' \
+  --output steven.png
 
-## Render without publishing
-
-To get the files as a workflow artifact instead, render any repository's releases on demand ([examples/artifacts.yml](examples/artifacts.yml)):
-
-```yaml
-- uses: maria-rcks/release-balls@v1
-  id: balls
-  with:
-    repository: pingdotgg/t3code
-    releases: '5'
-    match: nightly
-    metric: merger
-    format: both
-
-- uses: actions/upload-artifact@v4
-  with:
-    name: release-media
-    path: ${{ steps.balls.outputs.directory }}
+./target/release/e-balls --data e-counts.json --avatar steven.png --out out
 ```
 
-## Rank a time window
+`out/e-balls.mp4` is 1080×1080 at 60 fps. `out/e-balls.gif` is 480×480 at
+15 fps. Both run for 16 seconds by default. The output also includes the exact
+input JSON, the portrait used, and a render manifest. Existing output
+directories are refused; use a new `--out` path for another render.
 
-Set `since` to rank every PR merged in a window, with or without releases: `24h`, `7d`, `2w`, or a UTC date like `2026-09-01`. The title reads "Pull requests merged in the past week". [examples/weekly.yml](examples/weekly.yml) renders last week's PRs every Monday.
+Rendering is offline. It does not look up avatars from row labels. An unreadable
+portrait is an error, not permission to replace your head with initials.
 
-```yaml
-- uses: maria-rcks/release-balls@v1
-  with:
-    since: 7d
-```
-
-Windows come from GitHub search, which returns at most 1,000 PRs; use a shorter window for busier repositories.
-
-## Inputs
-
-| Input | Default | What it does |
-| --- | --- | --- |
-| `metric` | `author` | `author` counts merged PRs by author, `merger` counts who merged them, `changes` counts added + deleted lines by author. |
-| `format` | `mp4` | `gif`, `mp4`, or `both`. |
-| `since` | unset | Rank PRs merged in a window (`24h`, `7d`, `2w`, `2026-09-01`) instead of releases. Overrides `tag`, `releases`, and `match`. |
-| `tag` | the triggering release | Exact release tag. Overrides `releases` and `match`. Set `tag: ''` to select by count instead. |
-| `releases` | `1` | How many of the latest published releases to combine when `tag` is empty. |
-| `match` | `''` | Substring a tag must contain, such as `nightly`. Empty matches every tag. |
-| `users` | everyone except bots | Comma-separated logins to include. |
-| `top` | `10` | Show the top N contributors. `0` shows everyone. |
-| `repository` | current repository | `owner/repo` to read releases from. |
-| `token` | `github.token` | Token that can read the source repository's releases and PRs. |
-| `asset-base-url` | unset | URL where the media will be hosted, used to build links in `embed.md`. |
-| `output` | `release-balls-output` | Output directory. |
-
-## Outputs
-
-All outputs are paths on the runner.
-
-| Output | Contents |
-| --- | --- |
-| `directory` | Everything below, plus the GIF and/or MP4. |
-| `markdown` | `embed.md`, ready to paste into release notes. |
-| `manifest` | `manifest.json` with the rankings and generated files. |
-| `data` | `data.json`, a snapshot of the releases and PRs that were read. |
-
-To use the files in another job, upload `directory` as an artifact. See [passing files between jobs](docs/releases.md#pass-files-to-another-job).
+To measure the last seven **completed UTC days**, replace the pinned `--ref`
+with the source's current branch and omit `--start` and `--end`. The collector
+records the resolved commit SHA before reading. `--days`, `--end`, and
+`--letter` select other windows or ASCII letters.
 
 ## What gets counted
 
-- In release mode, only merged PRs linked from release notes count, as full URLs like `https://github.com/owner/repo/pull/123`. GitHub-generated release notes work. PRs are not inferred from commits between tags.
-- A PR linked from several selected releases counts once.
-- Drafts are skipped. Published prereleases are included.
-- Bots are excluded. Ties sort alphabetically.
-- The top 10 contributors are shown. With `top: 0`, everyone is shown and large lists split into columns with smaller labels.
-- The fastest ball crosses in one second, so speeds are relative within a clip. Clips last 16 seconds. MP4 is 1080px at 60fps, GIF is 480px at 15fps.
+We count ASCII `e` and `E` in the **full raw commit message**, including the
+subject, body, and trailers. Commit headers, diffs, code, PR comments, and
+unmerged branch tips do not count. Accented letters are not folded into `e`.
 
-## Run it locally
+Dates are UTC **committer** dates, not author dates or inferred merge times.
+The start is inclusive and the end is exclusive: the example above covers
+October 4–10, 2026. Empty days remain as zero rows. Shallow histories fail
+rather than quietly producing incomplete figures.
 
-Needs Rust 1.88+, FFmpeg, and FreeType headers (`libfreetype6-dev` and `pkg-config` on Ubuntu).
+All commits reachable from the pinned ref count once by SHA, including merge
+commits and merged branch ancestry. This is not a first-parent view and not a
+PR count. The collector walks the entire ancestry before filtering dates so
+out-of-order commit timestamps cannot truncate the result.
 
-```sh
-cargo build --release --locked
-export GH_TOKEN=...  # can read the source repository
-./target/release/release-balls --repo pingdotgg/t3code --releases 5 --match nightly --metric merger --format both
+The source is `EffortlessMetrics/perl-lsp-swarm`, the development repository
+for perl-lsp. The source repository is shown in the footer; the JSON records
+the ref, full SHA, window, counting rules, per-commit counts, and message
+SHA-256 digests. All authors are included. Repeating Steven's portrait does
+not turn this into an authorship claim.
+
+Rows remain in input order. Speed is linear relative to the largest count;
+the fastest ball crosses the arena in one second. A zero stays still. A small
+count really does barely move. There is no minimum speed or log scale.
+
+## Other ridiculous metrics
+
+Supply your own ordered JSON rather than inventing PR records:
+
+```json
+{
+  "schema_version": 1,
+  "title": "Synthetic example, not repository data",
+  "subtitle": "Any ordered labels and nonnegative integer counts",
+  "footer": "Your actual source",
+  "unit": "e's",
+  "unit_singular": "e",
+  "rows": [
+    {"label": "Monday", "count": 12},
+    {"label": "Tuesday", "count": 3},
+    {"label": "Wednesday", "count": 0}
+  ]
+}
 ```
 
-Files go to `out/`. The CLI defaults differ from the action: 5 releases matching `nightly`. Useful flags: `--since 7d`, `--tag`, `--per-release`, `--top N` (default 10, `0` for everyone), `--include-bots`, `--data data.json` to re-render a saved snapshot without calling the GitHub API. Run `--help` for the rest.
+Extra fields such as source receipts are preserved in the output snapshot.
+Labels, titles, units, and the portrait are independent. `--format mp4|gif|both`,
+`--duration`, `--width`, and `--fps` control export; GIF delivery stays 480px/15fps.
+Run `./target/release/e-balls --help` for all options.
 
-Rendering the example MP4 takes about 0.7 seconds on a 4-vCPU runner, excluding GitHub requests and the build.
+## Checks and attribution
 
-## More
+The fork's CI runs Git fixture tests, Rust tests, actual CLI/FFmpeg tests, and
+a pinned perl-lsp render. Media and verification receipts are uploaded as
+artifacts, not posted or attached to a release. No perl-lsp workflow is changed.
+All work and PRs belong in **EffortlessSteven/e-balls**, not Maria's repository.
 
-[Release publishing details](docs/releases.md) covers tag selection, private repositories, and releases created by other workflows.
+The original `release-balls` CLI and `action.yml` remain available for PR/release
+races; their documentation is in [docs/releases.md](docs/releases.md). The new
+letter-counter path uses `e-balls`, not that legacy action.
 
-## License
-
-[MIT](LICENSE). The bundled font is CC0; see [assets](assets/README.md).
+MIT. Maria's copyright and license are retained in [LICENSE](LICENSE).
+Bundled asset notices remain in [assets/README.md](assets/README.md).
