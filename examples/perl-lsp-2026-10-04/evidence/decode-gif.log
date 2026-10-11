@@ -1,0 +1,3 @@
+$ ffmpeg -v error -xerror -i examples/perl-lsp-2026-10-04/e-balls.gif -f null -
+
+Exit status: 0

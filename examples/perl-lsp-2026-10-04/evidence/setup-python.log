@@ -1,0 +1,15 @@
+$ mise install python@3.12
+mise python@3.12.15  [1/3] install
+mise python@3.12.15  [1/3] download cpython-3.12.15+20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+mise python@3.12.15  [1/3] generate checksum cpython-3.12.15+20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+mise python@3.12.15  [1/3] verify GitHub artifact attestations
+mise python@3.12.15  [1/3] ✓ GitHub artifact attestations verified
+mise python@3.12.15  [1/3] extract cpython-3.12.15+20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz
+mise python@3.12.15  [1/3] python --version
+mise python@3.12.15  [1/3] Python 3.12.15
+mise python@3.12.15 ✓ installed
+mise WARN  python installed but not activated — it is not in any config file.
+To install and activate, run:
+  mise use python
+
+Exit status: 0

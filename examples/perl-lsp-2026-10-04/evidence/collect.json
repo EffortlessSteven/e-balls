@@ -1,0 +1,7 @@
+{
+  "command": "git -C /home/vercel-sandbox/workspace/repos/perl-lsp-history.git rev-parse --is-shallow-repository && git -C /home/vercel-sandbox/workspace/repos/perl-lsp-history.git rev-list --count 31b87ee79b8fb55b6433bed7c1f1e4478443d61e && python3 scripts/count_letters.py --repo /home/vercel-sandbox/workspace/repos/perl-lsp-history.git --ref 31b87ee79b8fb55b6433bed7c1f1e4478443d61e --repository EffortlessMetrics/perl-lsp-swarm --project perl-lsp --start 2026-10-04 --end 2026-10-11 --out /tmp/e-balls-counts.json",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:00:16.695323+00:00",
+  "finished_at": "2026-10-11T22:00:17.320704+00:00",
+  "exit_status": 0
+}

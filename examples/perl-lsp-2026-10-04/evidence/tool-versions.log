@@ -1,0 +1,45 @@
+$ set -e; rustc --version; cargo --version; cargo fmt --version; cargo clippy --version; python3 --version; git --version; pkg-config --version; pkg-config --modversion freetype2; rpm -q freetype-devel; gcc --version; ffmpeg -version; ffprobe -version; uname -sm; command -v rustc cargo python3 ffmpeg ffprobe
+rustc 1.88.0 (6b00bc388 2025-06-23)
+cargo 1.88.0 (873a06493 2025-05-10)
+rustfmt 1.8.0-stable (6b00bc3880 2025-06-23)
+clippy 0.1.88 (6b00bc3880 2025-06-23)
+Python 3.12.15
+git version 2.49.0
+1.8.0
+26.1.20
+freetype-devel-2.13.2-5.amzn2023.0.2.x86_64
+gcc (GCC) 11.5.0 20240719 (Red Hat 11.5.0-5)
+Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+ffmpeg version 7.0.2-static https://johnvansickle.com/ffmpeg/  Copyright (c) 2000-2024 the FFmpeg developers
+built with gcc 8 (Debian 8.3.0-6)
+configuration: --enable-gpl --enable-version3 --enable-static --disable-debug --disable-ffplay --disable-indev=sndio --disable-outdev=sndio --cc=gcc --enable-fontconfig --enable-frei0r --enable-gnutls --enable-gmp --enable-libgme --enable-gray --enable-libaom --enable-libfribidi --enable-libass --enable-libvmaf --enable-libfreetype --enable-libmp3lame --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenjpeg --enable-librubberband --enable-libsoxr --enable-libspeex --enable-libsrt --enable-libvorbis --enable-libopus --enable-libtheora --enable-libvidstab --enable-libvo-amrwbenc --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxml2 --enable-libdav1d --enable-libxvid --enable-libzvbi --enable-libzimg
+libavutil      59.  8.100 / 59.  8.100
+libavcodec     61.  3.100 / 61.  3.100
+libavformat    61.  1.100 / 61.  1.100
+libavdevice    61.  1.100 / 61.  1.100
+libavfilter    10.  1.100 / 10.  1.100
+libswscale      8.  1.100 /  8.  1.100
+libswresample   5.  1.100 /  5.  1.100
+libpostproc    58.  1.100 / 58.  1.100
+ffprobe version 7.0.2-static https://johnvansickle.com/ffmpeg/  Copyright (c) 2007-2024 the FFmpeg developers
+built with gcc 8 (Debian 8.3.0-6)
+configuration: --enable-gpl --enable-version3 --enable-static --disable-debug --disable-ffplay --disable-indev=sndio --disable-outdev=sndio --cc=gcc --enable-fontconfig --enable-frei0r --enable-gnutls --enable-gmp --enable-libgme --enable-gray --enable-libaom --enable-libfribidi --enable-libass --enable-libvmaf --enable-libfreetype --enable-libmp3lame --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libopenjpeg --enable-librubberband --enable-libsoxr --enable-libspeex --enable-libsrt --enable-libvorbis --enable-libopus --enable-libtheora --enable-libvidstab --enable-libvo-amrwbenc --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 --enable-libxml2 --enable-libdav1d --enable-libxvid --enable-libzvbi --enable-libzimg
+libavutil      59.  8.100 / 59.  8.100
+libavcodec     61.  3.100 / 61.  3.100
+libavformat    61.  1.100 / 61.  1.100
+libavdevice    61.  1.100 / 61.  1.100
+libavfilter    10.  1.100 / 10.  1.100
+libswscale      8.  1.100 /  8.  1.100
+libswresample   5.  1.100 /  5.  1.100
+libpostproc    58.  1.100 / 58.  1.100
+Linux x86_64
+/home/vercel-sandbox/.cargo/bin/rustc
+/home/vercel-sandbox/.cargo/bin/cargo
+/home/vercel-sandbox/.local/share/mise/installs/python/3.12/bin/python3
+/home/vercel-sandbox/runtime/e-balls-tools/ffmpeg
+/home/vercel-sandbox/runtime/e-balls-tools/ffprobe
+
+Exit status: 0

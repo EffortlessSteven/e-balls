@@ -1,0 +1,7 @@
+{
+  "command": "python3 examples/perl-lsp-2026-10-04/evidence/check-media.py",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:04:21.282837+00:00",
+  "finished_at": "2026-10-11T22:04:21.477129+00:00",
+  "exit_status": 1
+}

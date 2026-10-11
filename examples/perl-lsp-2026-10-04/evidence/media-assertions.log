@@ -1,0 +1,8 @@
+$ python3 examples/perl-lsp-2026-10-04/evidence/check-media.py
+Traceback (most recent call last):
+  File "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls/examples/perl-lsp-2026-10-04/evidence/check-media.py", line 28, in <module>
+    assert a==b
+           ^^^^
+AssertionError
+
+Exit status: 1

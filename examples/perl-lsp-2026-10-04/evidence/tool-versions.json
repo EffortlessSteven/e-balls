@@ -1,0 +1,7 @@
+{
+  "command": "set -e; rustc --version; cargo --version; cargo fmt --version; cargo clippy --version; python3 --version; git --version; pkg-config --version; pkg-config --modversion freetype2; rpm -q freetype-devel; gcc --version; ffmpeg -version; ffprobe -version; uname -sm; command -v rustc cargo python3 ffmpeg ffprobe",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:00:36.250039+00:00",
+  "finished_at": "2026-10-11T22:00:36.492124+00:00",
+  "exit_status": 0
+}

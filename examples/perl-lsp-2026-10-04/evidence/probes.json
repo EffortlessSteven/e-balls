@@ -1,0 +1,7 @@
+{
+  "command": "set -e; ffprobe -v error -count_frames -show_streams -show_format -of json examples/perl-lsp-2026-10-04/e-balls.mp4 > examples/perl-lsp-2026-10-04/mp4-probe.json; ffprobe -v error -count_frames -show_streams -show_format -of json examples/perl-lsp-2026-10-04/e-balls.gif > examples/perl-lsp-2026-10-04/gif-probe.json; cat examples/perl-lsp-2026-10-04/mp4-probe.json examples/perl-lsp-2026-10-04/gif-probe.json",
+  "cwd": "/home/vercel-sandbox/workspace/repos/github.com/effortlesssteven/e-balls",
+  "started_at": "2026-10-11T22:03:49.479241+00:00",
+  "finished_at": "2026-10-11T22:03:50.324366+00:00",
+  "exit_status": 0
+}

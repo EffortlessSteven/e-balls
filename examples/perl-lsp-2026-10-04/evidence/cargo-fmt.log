@@ -1,0 +1,3 @@
+$ cargo fmt --all
+
+Exit status: 0

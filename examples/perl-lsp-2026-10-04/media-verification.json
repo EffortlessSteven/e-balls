@@ -1,0 +1,40 @@
+{
+  "verified": true,
+  "data_sha256": "c8ace15cb1d5fcdc6b089ed18bd1e5101298edf8265c8b66770ef3f64be5ed70",
+  "portrait_comparison": {
+    "source_format": "JPEG",
+    "source_dimensions": [
+      460,
+      460
+    ],
+    "rendered_format": "PNG",
+    "mean_absolute_rgb_difference": 0.8525157529930687,
+    "psnr_db": 46.786605053517086,
+    "acceptance": "MAE < 2 and PSNR > 40 dB; independent JPEG decoders"
+  },
+  "gif_frame_delays_seconds": [
+    0.06,
+    0.07
+  ],
+  "gif_frame_delay_total_seconds": 16.0,
+  "streams": {
+    "mp4": {
+      "width": 1080,
+      "height": 1080,
+      "frames": 960,
+      "duration_seconds": 16.0,
+      "average_frame_rate": "60/1",
+      "nominal_frame_rate": "60/1",
+      "codec": "h264"
+    },
+    "gif": {
+      "width": 480,
+      "height": 480,
+      "frames": 240,
+      "duration_seconds": 16.0,
+      "average_frame_rate": "50/3",
+      "nominal_frame_rate": "15/1",
+      "codec": "gif"
+    }
+  }
+}
