@@ -222,7 +222,10 @@ fn media_link(base: &str, filename: &str) -> Result<String> {
 fn media_markdown(base: &str, format: &str) -> Result<String> {
     let mut markdown = String::new();
     if format != "mp4" {
-        markdown.push_str(&format!("![e-balls]({})\n", media_link(base, "e-balls.gif")?));
+        markdown.push_str(&format!(
+            "![e-balls]({})\n",
+            media_link(base, "e-balls.gif")?
+        ));
     }
     if format != "gif" {
         markdown.push_str(&format!("\n[MP4]({})\n", media_link(base, "e-balls.mp4")?));
