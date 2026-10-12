@@ -11,18 +11,16 @@ if [[ ! "$EB_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   exit 2
 fi
 # Keep the old input as an alias without making whitespace or punctuation special.
-text="${EB_TEXT-e}"
+text="${EB_TEXT-}"
 if [[ -n "${EB_LETTER-}" ]]; then
-  if [[ "$text" != e ]]; then
+  if [[ -n "$text" ]]; then
     echo "use text or letter, not both" >&2
     exit 2
   fi
   text="$EB_LETTER"
 fi
-if [[ -z "$text" ]]; then
-  echo "text must be a nonempty literal string" >&2
-  exit 2
-fi
+# Empty composite-action inputs are unset; the CLI still rejects --text=.
+text="${text:-e}"
 case "${EB_CASE_SENSITIVE-false}" in
   true|false) ;;
   *) echo "case-sensitive must be true or false" >&2; exit 2 ;;

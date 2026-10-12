@@ -21,10 +21,10 @@ inputs:
     description: Optional exclusive UTC end date (YYYY-MM-DD), for a reproducible week
     default: ''
   text:
-    description: Nonempty literal string to count in full commit messages (not a regex)
-    default: e
+    description: Literal string to count in full commit messages (not a regex); empty uses e
+    default: ''
   letter:
-    description: Compatibility alias for text; do not combine with a non-default text
+    description: Compatibility alias for text; set only one of text or letter
     default: ''
   case-sensitive:
     description: Match exact UTF-8 bytes; otherwise only ASCII letter case is ignored

@@ -120,12 +120,24 @@ class ActionTransportTests(unittest.TestCase):
         self.assertIn('--case-sensitive',collector['args'])
         self.assertFalse(Path('SHOULD_NOT_EXIST').exists())
 
-    def test_bad_text_or_ambiguous_alias_fails_before_network(self):
-        for changes in [dict(EB_TEXT='',EB_LETTER=''),dict(EB_TEXT='a',EB_LETTER='b'),
+    def test_ambiguous_alias_or_case_mode_fails_before_network(self):
+        for changes in [dict(EB_TEXT='e',EB_LETTER='x'),dict(EB_TEXT='a',EB_LETTER='b'),
                         dict(EB_CASE_SENSITIVE='sometimes')]:
             with self.subTest(changes=changes):
                 p=self.run_wrapper(EB_DATA='',**changes)
                 self.assertNotEqual(p.returncode,0)
                 self.assertEqual(self.calls(),[])
+
+    def test_empty_action_inputs_resolve_to_default(self):
+        p=self.run_wrapper(EB_DATA='',EB_AVATAR='',EB_TEXT='',EB_LETTER='')
+        self.assertEqual(p.returncode,0,p.stderr)
+        collector=next(c for c in self.calls() if c['program']=='e-balls-collect')
+        self.assertEqual(collector['args'][collector['args'].index('--text')+1],'e')
+
+    def test_legacy_alias_accepts_an_entire_string(self):
+        p=self.run_wrapper(EB_DATA='',EB_AVATAR='',EB_TEXT='',EB_LETTER='fix:')
+        self.assertEqual(p.returncode,0,p.stderr)
+        collector=next(c for c in self.calls() if c['program']=='e-balls-collect')
+        self.assertEqual(collector['args'][collector['args'].index('--text')+1],'fix:')
 
 if __name__=='__main__': unittest.main()
