@@ -1,35 +1,80 @@
-name: release videos
+name: e-balls demo
 on:
   workflow_dispatch:
     inputs:
-      metric:
-        type: choice
-        options: [author, merger, changes]
-        default: author
-      since:
-        description: Window like 7d; empty renders the last five nightlies
-        default: 7d
+      repository:
+        description: Public owner/repository to read
+        type: string
+        default: EffortlessMetrics/perl-lsp-swarm
+        required: true
+      ref:
+        description: Source branch or reachable full commit SHA
+        type: string
+        default: main
+      project:
+        description: Project name shown in the chart
+        type: string
+        default: perl-lsp
+      text:
+        description: Literal text to count in commit messages
+        type: string
+        default: e
+      case_sensitive:
+        description: Match exact case
+        type: boolean
+        default: false
+      end:
+        description: Exclusive UTC end date (YYYY-MM-DD); empty uses today
+        type: string
+        default: ''
       format:
         type: choice
         options: [mp4, gif, both]
         default: both
+
 permissions:
   contents: read
+
+concurrency:
+  group: e-balls-demo-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   render:
+    if: github.repository == 'EffortlessSteven/e-balls'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: ./
         id: balls
         with:
-          repository: pingdotgg/t3code
-          releases: '5'
-          match: nightly
-          since: ${{ inputs.since }}
-          metric: ${{ inputs.metric }}
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.ref }}
+          project: ${{ inputs.project }}
+          text: ${{ inputs.text }}
+          case-sensitive: ${{ inputs.case_sensitive }}
+          since: 7d
+          end: ${{ inputs.end }}
           format: ${{ inputs.format }}
+          output: ${{ runner.temp }}/e-balls-demo
+      - name: Check generated media
+        shell: bash
+        env:
+          MEDIA_DIR: ${{ steps.balls.outputs.directory }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          media=("$MEDIA_DIR"/*.gif "$MEDIA_DIR"/*.mp4)
+          (( ${#media[@]} > 0 ))
+          for path in "${media[@]}"; do
+            ffmpeg -v error -xerror -i "$path" -f null -
+          done
       - uses: actions/upload-artifact@v4
         with:
-          name: release-balls
+          name: e-balls-demo
           path: ${{ steps.balls.outputs.directory }}
+          if-no-files-found: error
+          retention-days: 7

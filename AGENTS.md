@@ -31,3 +31,7 @@ Matching is non-overlapping per message; ASCII-only case folding is the default,
 and `case-sensitive` enables exact byte matching. `letter` remains an alias.
 Keep the q/2.0 roadmap and "other 29 letters" non-goal wording as jokes, not
 runtime restrictions. Preserve frozen examples and their original receipts.
+
+CI has no schedules. Keep README-only changes out of Rust/media jobs.
+Run live GitHub/avatar smoke tests and full examples only via manual CI dispatch.
+Do not add background demo refreshes or artifact-publishing loops.

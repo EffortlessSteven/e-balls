@@ -1,8 +1,19 @@
 name: CI
 on:
   pull_request:
+    paths-ignore:
+      - README.md
+      - AGENTS.md
+      - 'docs/**'
+      - LICENSE
   push:
-    branches: [main, feat/e-balls]
+    branches: [main]
+    paths-ignore:
+      - README.md
+      - AGENTS.md
+      - 'docs/**'
+      - LICENSE
+  # Live repository/avatar integrations and full demo renders are opt-in.
   workflow_dispatch:
 
 permissions:
@@ -32,6 +43,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88
         with:
           components: rustfmt, clippy
+      - name: Rust formatting
+        run: cargo fmt --all -- --check 2>&1 | tee verification/rustfmt.log
       - name: Native dependencies
         run: |
           sudo apt-get update -qq
@@ -39,7 +52,7 @@ jobs:
           rustc --version | tee verification/toolchain.txt
           cargo --version | tee -a verification/toolchain.txt
           ffmpeg -version | head -n 1 | tee -a verification/toolchain.txt
-      - name: Build both binaries
+      - name: Build all binaries
         run: cargo build --release --locked --bins 2>&1 | tee verification/build.log
       - name: Rust tests
         run: cargo test --locked --all-targets 2>&1 | tee verification/rust-tests.log
@@ -51,6 +64,7 @@ jobs:
           EBALLS_COLLECT_BIN: target/release/e-balls-collect
         run: python3 -m unittest discover -s tests -v 2>&1 | tee verification/python-tests.log
       - name: Render the pinned perl-lsp example
+        if: github.event_name == 'workflow_dispatch'
         run: |
           git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
             https://github.com/EffortlessMetrics/perl-lsp-swarm.git "$RUNNER_TEMP/perl-lsp.git"
@@ -72,18 +86,15 @@ jobs:
           ffmpeg -v error -ss 0.5 -i out/e-balls.mp4 -frames:v 1 out/preview.png
           cp verification/renderer-commit.txt out/renderer-commit.txt
           (cd out && sha256sum data.json avatar.png manifest.json e-balls.mp4 e-balls.gif > SHA256SUMS)
-      - name: Rust formatting
-        if: always()
-        run: cargo fmt --all -- --check 2>&1 | tee verification/rustfmt.log
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() }}
         with:
           name: e-balls-verification-${{ github.event_name }}
           path: verification/
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
         with:
           name: e-balls-binaries-${{ github.event_name }}
           path: |
@@ -91,18 +102,18 @@ jobs:
             target/release/e-balls-collect
             target/release/release-balls
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
         with:
           name: e-balls-perl-lsp-${{ github.event_name }}
           path: out/
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 7
           compression-level: 0
 
   action-smoke:
-    if: github.repository == 'EffortlessSteven/e-balls'
+    if: github.repository == 'EffortlessSteven/e-balls' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -264,7 +275,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ !cancelled() && steps.balls.outputs.directory != '' }}
         with:
           name: e-balls-selected-avatar-${{ github.event_name }}
           path: ${{ steps.balls.outputs.directory }}
