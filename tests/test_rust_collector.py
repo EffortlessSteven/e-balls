@@ -65,7 +65,7 @@ class RustCollectionTests(unittest.TestCase):
         return json.loads(destination.read_text())
 
     def test_rust_matches_python_and_independent_git_verifier(self):
-        a = self.commit(b"eE\n\nbody ee\x00delimiter", "2026-10-04T04:00:00+00:00")
+        a = self.commit(b"eE\n\nbody ee marker delimiter", "2026-10-04T04:00:00+00:00")
         b = self.commit(b"eeE\n\ntext", "2026-10-10T10:00:00+00:00",
                         email="else@example.test", name="Someone Else", parents=(a,))
         c = self.commit(b"e\n\ntrail e\n", "2026-10-06T16:00:00+00:00",
