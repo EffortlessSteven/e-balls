@@ -25,7 +25,8 @@ class RenderPairTests(unittest.TestCase):
         out=self.root/name
         subprocess.run([self.binary,'--data',str(self.data),'--avatar',str(self.avatar),
             '--format',fmt,'--out',str(out),'--width','320','--duration','0.4','--threads','2'],
-            stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True,timeout=45)
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True,timeout=45,
+            env={**os.environ,'GITHUB_OUTPUT':str(self.root/'github-output')})
         return out
 
     def test_pair_matches_separate_media_exactly(self):

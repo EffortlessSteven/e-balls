@@ -5,7 +5,7 @@ use release_balls::render::{render_with, Options, Presentation, Theme};
 use serde::Deserialize;
 use serde_json::json;
 use std::fs;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -15,7 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
     about = "Race arbitrary counts with the same head on every ball"
 )]
 struct Args {
-    /// JSON rows from scripts/count_letters.py, or your own schema-v1 data.
+    /// JSON rows from e-balls-collect, or your own schema-v1 data.
     #[arg(long)]
     data: PathBuf,
     /// Local PNG/JPEG portrait. Required; never fetches avatars or substitutes initials.
@@ -24,6 +24,9 @@ struct Args {
     /// New output directory. Existing directories are never overwritten.
     #[arg(long, default_value = "out")]
     out: PathBuf,
+    /// Optional public directory URL for the generated media links.
+    #[arg(long, default_value = "")]
+    asset_base_url: String,
     #[arg(long, default_value = "both", value_parser = ["mp4", "gif", "both"])]
     format: String,
     #[arg(long, default_value_t = 1080)]
@@ -190,6 +193,68 @@ fn render_formats(
     }
 }
 
+fn media_link(base: &str, filename: &str) -> Result<String> {
+    if base.is_empty() {
+        return Ok(filename.to_owned());
+    }
+    if base.chars().any(char::is_control) {
+        bail!("asset-base-url must not contain control characters");
+    }
+    let mut url = url::Url::parse(base).context("invalid asset-base-url")?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+    {
+        bail!(
+            "asset-base-url must be an HTTP(S) directory URL without credentials, query or fragment"
+        );
+    }
+    url.path_segments_mut()
+        .map_err(|_| anyhow::anyhow!("asset-base-url must support path segments"))?
+        .pop_if_empty()
+        .push(filename);
+    Ok(url.as_str().replace('(', "%28").replace(')', "%29"))
+}
+
+fn media_markdown(base: &str, format: &str) -> Result<String> {
+    let mut markdown = String::new();
+    if format != "mp4" {
+        markdown.push_str(&format!(
+            "![e-balls]({})\n",
+            media_link(base, "e-balls.gif")?
+        ));
+    }
+    if format != "gif" {
+        markdown.push_str(&format!("\n[MP4]({})\n", media_link(base, "e-balls.mp4")?));
+    }
+    Ok(markdown)
+}
+
+fn github_output_records(directory: &Path) -> Result<String> {
+    let directory = if directory.is_absolute() {
+        directory.to_owned()
+    } else {
+        std::env::current_dir()?.join(directory)
+    };
+    let mut records = String::new();
+    for (key, path) in [
+        ("directory", directory.clone()),
+        ("markdown", directory.join("embed.md")),
+        ("manifest", directory.join("manifest.json")),
+        ("data", directory.join("data.json")),
+    ] {
+        let path = path.to_str().context("GitHub output path must be UTF-8")?;
+        if path.contains(['\n', '\r']) {
+            bail!("GitHub output path must not contain newlines");
+        }
+        records.push_str(&format!("{key}={path}\n"));
+    }
+    Ok(records)
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
     if !(320..=2160).contains(&args.width)
@@ -203,6 +268,19 @@ fn main() -> Result<()> {
     if fs::symlink_metadata(&args.out).is_ok() {
         bail!("output already exists; choose a new --out directory");
     }
+    // Validate metadata and output-channel permissions before encoding anything.
+    let markdown = media_markdown(&args.asset_base_url, &args.format)?;
+    let github_output = if let Some(path) = std::env::var_os("GITHUB_OUTPUT") {
+        let records = github_output_records(&args.out)?;
+        let file = fs::OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(path)
+            .context("cannot open GITHUB_OUTPUT")?;
+        Some((file, records))
+    } else {
+        None
+    };
     let bytes = read_bounded(&args.data, 32 * 1024 * 1024)?;
     let data: Data = serde_json::from_slice(&bytes).context("invalid rows JSON")?;
     data.validate()?;
@@ -252,8 +330,9 @@ fn main() -> Result<()> {
     // Freeze the exact input, including any source receipts not interpreted by this CLI.
     fs::write(staging.path.join("data.json"), &bytes)?;
     image.save(staging.path.join("avatar.png"))?;
+    fs::write(staging.path.join("embed.md"), markdown)?;
     let manifest = json!({
-        "schema_version": 1, "renderer": "e-balls",
+        "schema_version": 1, "renderer": "e-balls", "markdown": "embed.md",
         "theme": {"name": "teal-cream", "background": "#f5f1e8", "foreground": "#156b76",
             "primary_font": "IBM Plex Sans Regular", "data_font": "IBM Plex Mono Regular",
             "font_sources": serde_json::from_str::<serde_json::Value>(include_str!("../../assets/plex-manifest.json"))?}, "source_data": "data.json",
@@ -266,6 +345,10 @@ fn main() -> Result<()> {
         format!("{}\n", serde_json::to_string_pretty(&manifest)?),
     )?;
     staging.publish(&args.out)?;
+    if let Some((mut file, records)) = github_output {
+        file.write_all(records.as_bytes())
+            .context("could not write GitHub Action outputs")?;
+    }
     println!("{}", serde_json::to_string_pretty(&manifest)?);
     Ok(())
 }
@@ -273,6 +356,41 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn markdown_matches_selected_formats_and_encodes_urls() -> Result<()> {
+        assert_eq!(media_markdown("", "gif")?, "![e-balls](e-balls.gif)\n");
+        assert_eq!(media_markdown("", "mp4")?, "\n[MP4](e-balls.mp4)\n");
+        let both = media_markdown("https://example.test/clip(1)/", "both")?;
+        assert!(both.contains("https://example.test/clip%281%29/e-balls.gif"));
+        assert!(both.contains("https://example.test/clip%281%29/e-balls.mp4"));
+        Ok(())
+    }
+
+    #[test]
+    fn reject_ambiguous_or_unsafe_asset_prefixes() {
+        for prefix in [
+            "javascript:alert(1)",
+            "file:///tmp",
+            "https://user:password@example.test",
+            "https://example.test/?query=value",
+            "https://example.test/#fragment",
+            "https://example.test/\nforge",
+        ] {
+            assert!(media_markdown(prefix, "both").is_err(), "{prefix}");
+        }
+    }
+
+    #[test]
+    fn output_records_are_absolute_and_single_line() -> Result<()> {
+        let records = github_output_records(Path::new("out"))?;
+        assert_eq!(records.lines().count(), 4);
+        let expected = std::env::current_dir()?.join("out").join("embed.md");
+        assert!(records.contains(&format!("markdown={}\n", expected.display())));
+        assert!(github_output_records(Path::new("out\nforged=value")).is_err());
+        assert!(github_output_records(Path::new("out\rforged=value")).is_err());
+        Ok(())
+    }
 
     #[test]
     fn parallel_formats_overlap_but_keep_manifest_order() -> Result<()> {
