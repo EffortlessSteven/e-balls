@@ -27,8 +27,8 @@ if [[ -n "$EB_DATA" && -z "$EB_AVATAR" ]]; then
   exit 2
 fi
 
-work=""
-cleanup() {
+# Reject invalid destinations/overrides before cloning or calling GitHub.
+if [[ -z "$EB_OUTPUT" || "$EB_OUTPUT" == *cleanup() {
   if [[ -n "$work" ]]; then
     rm -rf -- "$work"
   fi
@@ -56,13 +56,13 @@ else
     # A full reachable SHA makes the weekly replay reproducible.
     source_ref="$EB_REF"
   elif [[ -n "$EB_REF" ]]; then
-    git check-ref-format --branch "$EB_REF" >/dev/null
+    source_git check-ref-format --branch "$EB_REF" >/dev/null
     clone_args+=(--branch "$EB_REF")
     source_ref="$EB_REF"
   fi
   # Read-only clone; never pass the GitHub token to Git.
-  git clone "${clone_args[@]}" "https://github.com/$EB_REPOSITORY.git" "$work/history.git"
-  git -C "$work/history.git" config remote.origin.pushurl DISABLED
+  source_git clone "${clone_args[@]}" "https://github.com/$EB_REPOSITORY.git" "$work/history.git"
+  source_git -C "$work/history.git" config remote.origin.pushurl DISABLED
   data="$work/counts.json"
   counter_args=(
     --repo "$work/history.git" --ref "$source_ref"
@@ -85,23 +85,7 @@ if [[ ! -f "$avatar" ]]; then
   echo "avatar file not found: $avatar" >&2
   exit 2
 fi
-"$GITHUB_ACTION_PATH/target/release/e-balls" \
-  --data "$data" --avatar "$avatar" --format "$EB_FORMAT" --out "$output"
-
-base="$EB_ASSET_BASE"
-if [[ -n "$base" && "$base" != */ ]]; then
-  base="$base/"
-fi
-{
-  if [[ "$EB_FORMAT" != mp4 ]]; then
-    printf '![e-balls](%se-balls.gif)\n' "$base"
-  fi
-  if [[ "$EB_FORMAT" != gif ]]; then
-    printf '\n[MP4](%se-balls.mp4)\n' "$base"
-  fi
-} > "$output/embed.md"
-
-printf 'directory=%s\n' "$output" >> "$GITHUB_OUTPUT"
-printf 'markdown=%s/embed.md\n' "$output" >> "$GITHUB_OUTPUT"
-printf 'manifest=%s/manifest.json\n' "$output" >> "$GITHUB_OUTPUT"
-printf 'data=%s/data.json\n' "$output" >> "$GITHUB_OUTPUT"
+env -u EB_TOKEN -u GITHUB_TOKEN -u GH_TOKEN \
+  "$GITHUB_ACTION_PATH/target/release/e-balls" \
+  --data "$data" --avatar "$avatar" --format "$EB_FORMAT" --out "$output" \
+  --asset-base-url "$EB_ASSET_BASE"
