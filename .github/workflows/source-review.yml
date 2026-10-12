@@ -1,0 +1,39 @@
+name: Temporary source review
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  source:
+    if: github.repository == 'EffortlessSteven/e-balls' && github.head_ref == 'feat/literal-string-counts'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record review source
+        run: git rev-parse HEAD > REVIEW_HEAD.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: text-source-review
+          retention-days: 1
+          include-hidden-files: true
+          path: |
+            src/
+            scripts/
+            tests/
+            .github/workflows/ci.yml
+            action.yml
+            Cargo.toml
+            Cargo.lock
+            AGENTS.md
+            README.md
+            assets/plex-manifest.json
+            examples/weekly.yml
+            examples/artifacts.yml
+            examples/perl-lsp-2026-10-04-teal/data.json
+            examples/perl-lsp-2026-10-04-teal/avatar.png
+            examples/perl-lsp-2026-10-04/avatar.png
+            REVIEW_HEAD.txt
