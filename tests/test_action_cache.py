@@ -100,6 +100,14 @@ class ActionCacheTests(unittest.TestCase):
         self.executable('e-balls'); self.executable('e-balls-collect',1)
         self.assertEqual(self.ready('true'),'value=false')
 
+    def test_cache_paths_are_canonical_not_raw_action_paths(self):
+        action=(ROOT/'action.yml').read_text()
+        self.assertNotIn('github.action_path',action)
+        self.assertIn('realpath -m "$GITHUB_ACTION_PATH/target/release/e-balls"',action)
+        self.assertIn('realpath -m "$GITHUB_ACTION_PATH/target/release/e-balls-collect"',action)
+        self.assertEqual(action.count('steps.binary-key.outputs.renderer'),2)
+        self.assertEqual(action.count('steps.binary-key.outputs.collector'),2)
+
     def test_workflow_restores_before_conditionally_installing_rust(self):
         # Structural wiring check, not a successful remote cache-hit claim.
         action=(ROOT/'action.yml').read_text()
