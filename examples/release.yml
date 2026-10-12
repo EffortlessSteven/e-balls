@@ -18,7 +18,7 @@ jobs:
         run: |
           encoded_tag=$(jq -rn --arg tag "$RELEASE_TAG" '$tag | @uri')
           echo "url=https://github.com/$GITHUB_REPOSITORY/releases/download/$encoded_tag" >> "$GITHUB_OUTPUT"
-      - uses: maria-rcks/release-balls@v1
+      - uses: maria-rcks/release-balls@9580e22052ee1036dd411ca824086c123ae796c4 # v1.2.0
         id: balls
         with:
           format: both
@@ -47,7 +47,7 @@ jobs:
             printf '<!-- release-balls:end -->\n'
           } >> "$RUNNER_TEMP/updated.md"
           gh release edit "$RELEASE_TAG" --notes-file "$RUNNER_TEMP/updated.md"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-media
           path: ${{ steps.balls.outputs.directory }}

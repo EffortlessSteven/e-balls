@@ -32,7 +32,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - name: Record the checkout being tested
@@ -40,8 +40,9 @@ jobs:
           mkdir -p verification
           git rev-parse HEAD | tee verification/renderer-commit.txt
           git status --porcelain=v1 > verification/initial-status.txt
-      - uses: dtolnay/rust-toolchain@1.88
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master; Rust 1.88.0
         with:
+          toolchain: '1.88.0'
           components: rustfmt, clippy
       - name: Rust formatting
         run: cargo fmt --all -- --check 2>&1 | tee verification/rustfmt.log
@@ -86,14 +87,14 @@ jobs:
           ffmpeg -v error -ss 0.5 -i out/e-balls.mp4 -frames:v 1 out/preview.png
           cp verification/renderer-commit.txt out/renderer-commit.txt
           (cd out && sha256sum data.json avatar.png manifest.json e-balls.mp4 e-balls.gif > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() }}
         with:
           name: e-balls-verification-${{ github.event_name }}
           path: verification/
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
         with:
           name: e-balls-binaries-${{ github.event_name }}
@@ -103,7 +104,7 @@ jobs:
             target/release/release-balls
           if-no-files-found: ignore
           retention-days: 7
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' }}
         with:
           name: e-balls-perl-lsp-${{ github.event_name }}
@@ -117,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
       - uses: ./
@@ -267,14 +268,14 @@ jobs:
           PYCODE
           ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.gif" -f null -
           ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.mp4" -f null -
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: success()
         with:
           name: e-balls-literal-string-${{ github.event_name }}
           path: ${{ steps.literal-string.outputs.directory }}
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ !cancelled() && steps.balls.outputs.directory != '' }}
         with:
           name: e-balls-selected-avatar-${{ github.event_name }}

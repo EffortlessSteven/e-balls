@@ -112,7 +112,10 @@ class ActionCacheTests(unittest.TestCase):
         # Structural wiring check, not a successful remote cache-hit claim.
         action=(ROOT/'action.yml').read_text()
         self.assertLess(action.index('actions/cache/restore@'),action.index('dtolnay/rust-toolchain@'))
-        self.assertIn("dtolnay/rust-toolchain@1.88.0\n      if: steps.ready.outputs.value != 'true'",action)
+        toolchain=action.split('    - uses: dtolnay/rust-toolchain@',1)[1].split('    - id: build',1)[0]
+        self.assertRegex(toolchain, r"^[0-9a-f]{40} # master; Rust 1\.88\.0\n")
+        self.assertIn("if: steps.ready.outputs.value != 'true'",toolchain)
+        self.assertIn("toolchain: '1.88.0'",toolchain)
         self.assertLess(action.index('actions/cache/save@'),action.index('    - id: render\n'))
         self.assertNotIn('runner.imageos',action)
 
