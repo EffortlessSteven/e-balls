@@ -231,8 +231,8 @@ fn main() -> Result<()> {
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let staging = Staging::create(parent.join(format!(".e-balls-{}-{stamp}", std::process::id())))?;
     let stem = staging.path.join("e-balls");
-    let parallel = args.threads > 1
-        && std::thread::available_parallelism().is_ok_and(|cores| cores.get() > 1);
+    let parallel =
+        args.threads > 1 && std::thread::available_parallelism().is_ok_and(|cores| cores.get() > 1);
     let files = render_formats(&args.format, parallel, |format| {
         let options = Options {
             width: if format == "gif" { 480 } else { args.width },
