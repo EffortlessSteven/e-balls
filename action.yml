@@ -1,5 +1,5 @@
 name: e-balls
-description: Race occurrences of e in perl-lsp commit messages as a GIF and MP4
+description: Race the letters behind a release as a GIF and MP4. A GitHub Action.
 branding:
   icon: activity
   color: green
