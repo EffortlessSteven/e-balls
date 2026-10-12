@@ -18,7 +18,8 @@ with log.open('a') as f:
 if name=='git':
     if sys.argv[1]=='clone': pathlib.Path(sys.argv[-1]).mkdir()
     sys.exit(0)
-args=dict(zip(sys.argv[1::2],sys.argv[2::2]))
+options=[v for v in sys.argv[1:] if v != '--case-sensitive']
+args=dict(zip(options[0::2],options[1::2]))
 if name=='e-balls-collect':
     if os.environ.get('FAIL_COLLECT'): sys.exit(42)
     pathlib.Path(args['--out']).write_text('{"schema_version":1}')
@@ -109,5 +110,34 @@ class ActionTransportTests(unittest.TestCase):
         self.assertFalse(any(c['program']=='e-balls' for c in self.calls()))
         self.assertEqual(list(self.root.glob('e-balls-source.*')),[])
         self.assertFalse((self.root/'output').exists())
+
+    def test_literal_text_is_one_argument_not_shell_code(self):
+        text = "Fix: $(touch SHOULD_NOT_EXIST); [.*] \n🦀"
+        p=self.run_wrapper(EB_DATA='',EB_AVATAR='',EB_LETTER='',EB_TEXT=text,EB_CASE_SENSITIVE='true')
+        self.assertEqual(p.returncode,0,p.stderr)
+        collector=next(c for c in self.calls() if c['program']=='e-balls-collect')
+        self.assertEqual(collector['args'][collector['args'].index('--text')+1],text)
+        self.assertIn('--case-sensitive',collector['args'])
+        self.assertFalse(Path('SHOULD_NOT_EXIST').exists())
+
+    def test_ambiguous_alias_or_case_mode_fails_before_network(self):
+        for changes in [dict(EB_TEXT='e',EB_LETTER='x'),dict(EB_TEXT='a',EB_LETTER='b'),
+                        dict(EB_CASE_SENSITIVE='sometimes')]:
+            with self.subTest(changes=changes):
+                p=self.run_wrapper(EB_DATA='',**changes)
+                self.assertNotEqual(p.returncode,0)
+                self.assertEqual(self.calls(),[])
+
+    def test_empty_action_inputs_resolve_to_default(self):
+        p=self.run_wrapper(EB_DATA='',EB_AVATAR='',EB_TEXT='',EB_LETTER='')
+        self.assertEqual(p.returncode,0,p.stderr)
+        collector=next(c for c in self.calls() if c['program']=='e-balls-collect')
+        self.assertEqual(collector['args'][collector['args'].index('--text')+1],'e')
+
+    def test_legacy_alias_accepts_an_entire_string(self):
+        p=self.run_wrapper(EB_DATA='',EB_AVATAR='',EB_TEXT='',EB_LETTER='fix:')
+        self.assertEqual(p.returncode,0,p.stderr)
+        collector=next(c for c in self.calls() if c['program']=='e-balls-collect')
+        self.assertEqual(collector['args'][collector['args'].index('--text')+1],'fix:')
 
 if __name__=='__main__': unittest.main()

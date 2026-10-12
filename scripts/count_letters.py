@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Count ASCII letters in full commit messages, grouped by UTC committer day."""
+"""Reference literal-string collector, grouped by UTC committer day."""
 from __future__ import annotations
 
 import argparse
@@ -30,13 +30,20 @@ def git(repo: Path, *args: str, input: bytes | None = None) -> bytes:
 
 
 def collect(repo: Path, ref: str, start: dt.date, end: dt.date,
-            repository: str, project: str, letter: str = "e") -> dict[str, Any]:
+            repository: str, project: str, letter: str = "e",
+            *, text: str | None = None, case_sensitive: bool = False) -> dict[str, Any]:
     """Read one pinned ancestry, including merges; end is exclusive."""
     days = (end - start).days
     if not 1 <= days <= MAX_DAYS:
         raise ValueError(f"window must contain 1–{MAX_DAYS} complete UTC days")
-    if not re.fullmatch(r"[A-Za-z]", letter):
-        raise ValueError("letter must be one ASCII letter")
+    text = letter if text is None else text
+    if not isinstance(text, str) or not text:
+        raise ValueError("text must be a nonempty literal string")
+    needle = text.encode("utf-8")
+    if not case_sensitive:
+        needle = needle.lower()
+    legacy_letter = (needle.decode("ascii") if len(needle) == 1
+                     and needle.isalpha() and not case_sensitive else None)
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
         raise ValueError("repository must be owner/name")
     if not project.strip() or len(project) > 80 or any(ord(c) < 32 for c in project):
@@ -61,7 +68,6 @@ def collect(repo: Path, ref: str, start: dt.date, end: dt.date,
         if first <= timestamp < stop:
             selected[sha] = timestamp
 
-    lower, upper = letter.lower().encode(), letter.upper().encode()
     receipts: list[dict[str, Any]] = []
     # One batch request, length-framed raw objects: delimiters, NULs, encoding
     # headers, and multiline bodies cannot turn message text into metadata.
@@ -88,7 +94,7 @@ def collect(repo: Path, ref: str, start: dt.date, end: dt.date,
         committer = next((line for line in headers.splitlines() if line.startswith(b"committer ")), None)
         if committer is None or int(committer.rsplit(b" ", 2)[1]) != selected[sha]:
             raise ValueError(f"committer timestamp disagrees with revision walk: {sha}")
-        count = message.count(lower) + message.count(upper)
+        count = (message if case_sensitive else message.lower()).count(needle)
         timestamp = dt.datetime.fromtimestamp(selected[sha], UTC)
         day = timestamp.date().isoformat()
         buckets[day]["count"] += count
@@ -104,12 +110,13 @@ def collect(repo: Path, ref: str, start: dt.date, end: dt.date,
              "date": day.isoformat(), "commits": buckets[day.isoformat()]["commits"]}
             for day in calendar]
     final_day = end - dt.timedelta(days=1)
-    return {
+    data = {
         "schema_version": 1,
-        "title": f"Occurrences of '{letter.lower()}' in {project} commit messages",
+        "title": f"Occurrences of '{legacy_letter or display_text(text)}' in {project} commit messages",
         "subtitle": f"{start.isoformat()} to {final_day.isoformat()} · UTC",
         "footer": f"github.com/{repository}",
-        "unit": f"{letter.lower()}'s", "unit_singular": letter.lower(), "rows": rows,
+        "unit": f"{legacy_letter}'s" if legacy_letter else "matches",
+        "unit_singular": legacy_letter or "match", "rows": rows,
         "source": {
             "repository": repository, "requested_ref": ref, "commit": pin,
             "start_inclusive": start.isoformat() + "T00:00:00Z",
@@ -117,11 +124,28 @@ def collect(repo: Path, ref: str, start: dt.date, end: dt.date,
             "timestamp": "committer", "timezone": "UTC",
             "traversal": "all reachable commits, including merges; each SHA once",
             "message": "full raw commit message, including body and trailers",
-            "letter": letter.lower(), "case": "ASCII-insensitive",
+            "matcher": {"kind": "literal", "text": text,
+                        "case": "sensitive" if case_sensitive else "ascii-insensitive",
+                        "overlapping": False},
             "total_commits": len(receipts), "total_count": sum(row["count"] for row in rows),
             "commits": receipts,
         },
     }
+    if legacy_letter:
+        data["source"].update(letter=legacy_letter, case="ASCII-insensitive")
+    return data
+
+
+def display_text(text: str) -> str:
+    """Escape unsupported glyphs/control characters without changing counted bytes."""
+    short = {"\n": r"\n", "\r": r"\r", "\t": r"\t", "\\": r"\\", "'": r"\'", '"': r'\"'}
+    label = ""
+    for character in text:
+        escaped = short.get(character, character if " " <= character <= "~" else f"\\u{{{ord(character):x}}}")
+        if len(label) + len(escaped) > 64:
+            return label + "..."
+        label += escaped
+    return label
 
 
 def write_json(path: Path, value: dict[str, Any]) -> None:
@@ -147,7 +171,8 @@ def main() -> None:
     parser.add_argument("--ref", default="HEAD", help="commit/ref to freeze before reading")
     parser.add_argument("--repository", required=True, help="source owner/name, for attribution only")
     parser.add_argument("--project", default="perl-lsp")
-    parser.add_argument("--letter", default="e")
+    parser.add_argument("--text", "--letter", dest="text", default="e", help="nonempty literal UTF-8 string")
+    parser.add_argument("--case-sensitive", action="store_true", help="disable ASCII case folding")
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--since", choices=["7d"], help="seven completed UTC days before --end (default today)")
     group.add_argument("--start", type=dt.date.fromisoformat)
@@ -161,7 +186,8 @@ def main() -> None:
         if args.start is None and not 1 <= days <= MAX_DAYS:
             raise ValueError(f"days must be between 1 and {MAX_DAYS}")
         start = args.start or args.end - dt.timedelta(days=days)
-        data = collect(args.repo, args.ref, start, args.end, args.repository, args.project, args.letter)
+        data = collect(args.repo, args.ref, start, args.end, args.repository, args.project,
+                       text=args.text, case_sensitive=args.case_sensitive)
         write_json(args.out, data)
     except (ValueError, OSError, OverflowError) as error:
         parser.exit(2, f"error: {error}\n")

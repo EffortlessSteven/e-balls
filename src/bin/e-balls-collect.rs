@@ -4,6 +4,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use chrono::{DateTime, Duration as DateDuration, NaiveDate, Utc};
 use clap::Parser;
+use release_balls::matching::LiteralMatcher;
 use reqwest::blocking::Client;
 use reqwest::redirect::Policy;
 use ring::digest::{digest, SHA256};
@@ -21,7 +22,7 @@ const MAX_OBJECT: usize = 32 * 1024 * 1024;
 #[derive(Parser)]
 #[command(
     version,
-    about = "Count letters in commit messages and select the top contributor"
+    about = "Count literal strings in commit messages and select the top contributor"
 )]
 struct Args {
     #[arg(long)]
@@ -33,8 +34,17 @@ struct Args {
     repository: String,
     #[arg(long, default_value = "perl-lsp")]
     project: String,
-    #[arg(long, default_value = "e")]
-    letter: String,
+    /// Nonempty literal text, not a regular expression. --letter remains an alias.
+    #[arg(
+        long,
+        visible_alias = "letter",
+        default_value = "e",
+        allow_hyphen_values = true
+    )]
+    text: String,
+    /// Match exact bytes; by default only ASCII letter case is ignored.
+    #[arg(long)]
+    case_sensitive: bool,
     #[arg(long, conflicts_with_all = ["days", "start"])]
     since: Option<String>,
     #[arg(long, conflicts_with = "start")]
@@ -139,13 +149,6 @@ fn committer_time(headers: &[u8]) -> Result<i64> {
         .context("invalid committer UTC epoch")
 }
 
-fn count_ascii(message: &[u8], letter: u8) -> u64 {
-    message
-        .iter()
-        .filter(|byte| byte.to_ascii_lowercase() == letter)
-        .count() as u64
-}
-
 fn ranked_authors(authors: BTreeMap<String, Author>) -> Vec<Author> {
     let mut ranked: Vec<_> = authors.into_values().filter(|author| !author.bot).collect();
     ranked.sort_by(|a, b| {
@@ -183,7 +186,7 @@ fn count(
     project: &str,
     start: NaiveDate,
     end: NaiveDate,
-    letter: u8,
+    matcher: &LiteralMatcher,
 ) -> Result<(Value, Vec<Author>)> {
     validate_repository(repository)?;
     if project.is_empty() || project.len() > 80 || project.chars().any(char::is_control) {
@@ -314,7 +317,7 @@ fn count(
                 let when = DateTime::<Utc>::from_timestamp(actual_time, 0)
                     .context("timestamp is outside the supported range")?;
                 let day = when.date_naive().to_string();
-                let value = count_ascii(message, letter);
+                let value = matcher.count(message);
                 let bucket = buckets
                     .get_mut(&day)
                     .context("selected commit lies outside window")?;
@@ -377,14 +380,15 @@ fn count(
         .values()
         .try_fold(0_u64, |sum, (count, _)| sum.checked_add(*count))
         .context("total count overflow")?;
-    let lower = (letter as char).to_ascii_lowercase();
-    let data = json!({
+    let label = matcher.display();
+    let (plural, singular) = matcher.units();
+    let mut data = json!({
         "schema_version": 1,
-        "title": format!("Occurrences of '{lower}' in {project} commit messages"),
+        "title": format!("Occurrences of '{label}' in {project} commit messages"),
         "subtitle": format!("{} to {} · UTC", start, end.pred_opt().context("bad end")?),
         "footer": format!("github.com/{repository}"),
-        "unit": format!("{lower}'s"),
-        "unit_singular": lower.to_string(),
+        "unit": plural,
+        "unit_singular": singular,
         "rows": rows,
         "source": {
             "repository": repository,
@@ -396,13 +400,16 @@ fn count(
             "timezone": "UTC",
             "traversal": "all reachable commits, including merges; each SHA once",
             "message": "full raw commit message, including body and trailers",
-            "letter": lower.to_string(),
-            "case": "ASCII-insensitive",
+            "matcher": matcher.metadata(),
             "total_commits": receipts.len(),
             "total_count": total_count,
             "commits": receipts,
         }
     });
+    if let Some(letter) = matcher.legacy_letter() {
+        data["source"]["letter"] = json!(letter);
+        data["source"]["case"] = json!("ASCII-insensitive");
+    }
     Ok((data, ranked_authors(authors)))
 }
 
@@ -485,10 +492,10 @@ fn fetch_top_avatar(repository: &str, ranked: &[Author], destination: &Path) -> 
         "login": login,
         "id": id,
         "author_name": top.name,
-        "counted_letters": top.count,
+        "counted_matches": top.count,
         "authored_commits": top.commits,
         "sample_commit": sample_sha,
-        "selection": "non-bot Git author with most counted letters; then commits; then author identity",
+        "selection": "non-bot Git author with most literal matches; then commits; then author identity",
         "avatar_url": avatar_url,
         "avatar_sha256": sha256(&normalized),
     }))
@@ -518,10 +525,7 @@ fn write_json(path: &Path, value: &Value) -> Result<()> {
 }
 
 fn run(args: Args) -> Result<()> {
-    let letter = args.letter.as_bytes();
-    if letter.len() != 1 || !letter[0].is_ascii_alphabetic() {
-        bail!("letter must be one ASCII letter");
-    }
+    let matcher = LiteralMatcher::new(args.text, args.case_sensitive)?;
     let end = args.end.unwrap_or_else(|| Utc::now().date_naive());
     let start = if let Some(start) = args.start {
         start
@@ -535,7 +539,8 @@ fn run(args: Args) -> Result<()> {
         if !(1..=MAX_DAYS).contains(&days) {
             bail!("days must be between 1 and {MAX_DAYS}");
         }
-        end - DateDuration::days(days)
+        end.checked_sub_signed(DateDuration::days(days))
+            .context("window starts outside the supported calendar")?
     };
     let (mut value, authors) = count(
         &args.repo,
@@ -544,10 +549,14 @@ fn run(args: Args) -> Result<()> {
         &args.project,
         start,
         end,
-        letter[0].to_ascii_lowercase(),
+        &matcher,
     )?;
     if let Some(destination) = &args.avatar_out {
-        let contributor = fetch_top_avatar(&args.repository, &authors, destination)?;
+        let mut contributor = fetch_top_avatar(&args.repository, &authors, destination)?;
+        contributor["matcher"] = matcher.metadata();
+        if matcher.legacy_letter().is_some() {
+            contributor["counted_letters"] = contributor["counted_matches"].clone();
+        }
         value["source"]["top_contributor"] = contributor;
     }
     let count = value["source"]["total_count"]
@@ -558,7 +567,7 @@ fn run(args: Args) -> Result<()> {
         .context("missing commits")?;
     write_json(&args.out, &value)?;
     println!(
-        "{commits} commits, {count} letters, {} → {}",
+        "{commits} commits, {count} matches, {} → {}",
         value["source"]["commit"],
         args.out.display()
     );
@@ -578,7 +587,12 @@ mod tests {
         assert!(is_sha(&"a".repeat(40)));
         assert!(!is_sha("HEAD"));
         assert!(!is_sha(&"g".repeat(40)));
-        assert_eq!(count_ascii("éEEE ee".as_bytes(), b'e'), 5);
+        assert_eq!(
+            LiteralMatcher::new("e", false)
+                .unwrap()
+                .count("éEEE ee".as_bytes()),
+            5
+        );
         assert_eq!(
             sha256(b"abc"),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
@@ -631,6 +645,32 @@ mod tests {
         assert_eq!(ranked.len(), 2);
         assert_eq!(ranked[0].key, "email:xyz@example.com");
         assert_eq!(ranked[1].key, "email:abc@example.com");
+    }
+
+    #[test]
+    fn contributor_ranking_uses_the_configured_string() -> Result<()> {
+        let matcher = LiteralMatcher::new("fix:", false)?;
+        let authors = [
+            ("a", b"eeeeeeeeeeeeeeee fix:".as_slice()),
+            ("b", b"Fix: FIX: fix:"),
+        ]
+        .into_iter()
+        .map(|(key, message)| {
+            let author = Author {
+                key: key.into(),
+                name: key.into(),
+                count: matcher.count(message),
+                commits: 1,
+                shas: Vec::new(),
+                bot: false,
+            };
+            (author.key.clone(), author)
+        })
+        .collect();
+        let ranked = ranked_authors(authors);
+        assert_eq!(ranked[0].name, "b");
+        assert_eq!(ranked[0].count, 3);
+        Ok(())
     }
 
     #[test]
