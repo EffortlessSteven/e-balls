@@ -27,6 +27,7 @@ To render on demand and download the files as a workflow artifact, use [examples
   id: balls
   with:
     repository: EffortlessMetrics/perl-lsp-swarm
+    project: perl-lsp
     since: 7d
     format: both
 

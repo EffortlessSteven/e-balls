@@ -15,6 +15,7 @@ jobs:
         id: balls
         with:
           repository: EffortlessMetrics/perl-lsp-swarm
+          project: perl-lsp
           since: 7d
           format: both
 
