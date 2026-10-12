@@ -28,7 +28,24 @@ if [[ -n "$EB_DATA" && -z "$EB_AVATAR" ]]; then
 fi
 
 # Reject invalid destinations/overrides before cloning or calling GitHub.
-if [[ -z "$EB_OUTPUT" || "$EB_OUTPUT" == *cleanup() {
+if [[ -z "$EB_OUTPUT" || "$EB_OUTPUT" == *$'\n'* || "$EB_OUTPUT" == *$'\r'* ]]; then
+  echo "output must be a nonempty path without newlines" >&2
+  exit 2
+fi
+if [[ -e "$EB_OUTPUT" || -L "$EB_OUTPUT" ]]; then
+  echo "output already exists; choose a new output directory" >&2
+  exit 2
+fi
+if [[ -n "$EB_AVATAR" && ! -f "$EB_AVATAR" ]]; then
+  echo "avatar file not found: $EB_AVATAR" >&2
+  exit 2
+fi
+source_git() {
+  env -u EB_TOKEN -u GITHUB_TOKEN -u GH_TOKEN GIT_TERMINAL_PROMPT=0 git "$@"
+}
+
+work=""
+cleanup() {
   if [[ -n "$work" ]]; then
     rm -rf -- "$work"
   fi
