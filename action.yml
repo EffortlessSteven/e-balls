@@ -59,38 +59,69 @@ outputs:
 runs:
   using: composite
   steps:
-    - uses: dtolnay/rust-toolchain@1.88
     - id: binary-key
       shell: bash
       run: |
         set -euo pipefail
-        digest=$(cat "$GITHUB_ACTION_PATH"/Cargo.toml "$GITHUB_ACTION_PATH"/Cargo.lock "$GITHUB_ACTION_PATH"/src/*.rs "$GITHUB_ACTION_PATH"/src/bin/*.rs "$GITHUB_ACTION_PATH"/assets/*.ttf | sha256sum | cut -d' ' -f1)
-        echo "key=e-balls-rust-${{ runner.os }}-${{ runner.arch }}-${{ runner.imageos }}-$digest" >> "$GITHUB_OUTPUT"
-    - uses: actions/cache@v4
+        digest=$(bash "$GITHUB_ACTION_PATH/scripts/action_cache_key.sh" "$GITHUB_ACTION_PATH")
+        os=$(sha256sum /etc/os-release | cut -d ' ' -f 1)
+        echo "key=e-balls-v2-rust1.88.0-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-$os}-$digest" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache/restore@v4
       id: binary
       with:
         path: |
           ${{ github.action_path }}/target/release/e-balls
           ${{ github.action_path }}/target/release/e-balls-collect
         key: ${{ steps.binary-key.outputs.key }}
-    - name: Build e-balls on cache miss
-      if: steps.binary.outputs.cache-hit != 'true'
+    - name: Native runtime dependencies
       shell: bash
       run: |
         set -euo pipefail
-        if ! pkg-config --exists freetype2; then
+        packages=()
+        command -v git >/dev/null || packages+=(git)
+        command -v ffmpeg >/dev/null || packages+=(ffmpeg)
+        if ! ldconfig -p | grep -F 'libfreetype.so.6' >/dev/null; then
+          packages+=(libfreetype6)
+        fi
+        if (( ${#packages[@]} )); then
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "${packages[@]}"
+        fi
+    - id: ready
+      name: Check the restored binary pair
+      shell: bash
+      env:
+        RESTORED: ${{ steps.binary.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        ready=false
+        if [[ "$RESTORED" == true ]] &&
+           "$GITHUB_ACTION_PATH/target/release/e-balls" --version >/dev/null 2>&1 &&
+           "$GITHUB_ACTION_PATH/target/release/e-balls-collect" --version >/dev/null 2>&1; then
+          ready=true
+        fi
+        echo "value=$ready" >> "$GITHUB_OUTPUT"
+    - uses: dtolnay/rust-toolchain@1.88.0
+      if: steps.ready.outputs.value != 'true'
+    - id: build
+      name: Build e-balls on cache miss
+      if: steps.ready.outputs.value != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v pkg-config >/dev/null || ! pkg-config --exists freetype2; then
           sudo apt-get update -qq
           sudo apt-get install -y -qq libfreetype6-dev pkg-config
         fi
         cargo build --release --locked --manifest-path "$GITHUB_ACTION_PATH/Cargo.toml" --bin e-balls --bin e-balls-collect
-    - name: Install FFmpeg if missing
-      shell: bash
-      run: |
-        set -euo pipefail
-        if ! command -v ffmpeg >/dev/null; then
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
-        fi
+    - name: Save binaries before collecting repository data
+      uses: actions/cache/save@v4
+      if: steps.binary.outputs.cache-hit != 'true' && steps.build.outcome == 'success'
+      with:
+        path: |
+          ${{ github.action_path }}/target/release/e-balls
+          ${{ github.action_path }}/target/release/e-balls-collect
+        key: ${{ steps.binary-key.outputs.key }}
     - id: render
       shell: bash
       env:
