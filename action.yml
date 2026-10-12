@@ -66,12 +66,14 @@ runs:
         digest=$(bash "$GITHUB_ACTION_PATH/scripts/action_cache_key.sh" "$GITHUB_ACTION_PATH")
         os=$(sha256sum /etc/os-release | cut -d ' ' -f 1)
         echo "key=e-balls-v2-rust1.88.0-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-$os}-$digest" >> "$GITHUB_OUTPUT"
+        printf 'renderer=%s\n' "$(realpath -m "$GITHUB_ACTION_PATH/target/release/e-balls")" >> "$GITHUB_OUTPUT"
+        printf 'collector=%s\n' "$(realpath -m "$GITHUB_ACTION_PATH/target/release/e-balls-collect")" >> "$GITHUB_OUTPUT"
     - uses: actions/cache/restore@v4
       id: binary
       with:
         path: |
-          ${{ github.action_path }}/target/release/e-balls
-          ${{ github.action_path }}/target/release/e-balls-collect
+          ${{ steps.binary-key.outputs.renderer }}
+          ${{ steps.binary-key.outputs.collector }}
         key: ${{ steps.binary-key.outputs.key }}
     - name: Native runtime dependencies
       shell: bash
@@ -119,8 +121,8 @@ runs:
       if: steps.binary.outputs.cache-hit != 'true' && steps.build.outcome == 'success'
       with:
         path: |
-          ${{ github.action_path }}/target/release/e-balls
-          ${{ github.action_path }}/target/release/e-balls-collect
+          ${{ steps.binary-key.outputs.renderer }}
+          ${{ steps.binary-key.outputs.collector }}
         key: ${{ steps.binary-key.outputs.key }}
     - id: render
       shell: bash
