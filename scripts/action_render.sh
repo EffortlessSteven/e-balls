@@ -10,10 +10,23 @@ if [[ ! "$EB_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   echo "repository must be a GitHub owner/name" >&2
   exit 2
 fi
-if [[ ! "$EB_LETTER" =~ ^[A-Za-z]$ ]]; then
-  echo "letter must be one ASCII letter" >&2
+# Keep the old input as an alias without making whitespace or punctuation special.
+text="${EB_TEXT-e}"
+if [[ -n "${EB_LETTER-}" ]]; then
+  if [[ "$text" != e ]]; then
+    echo "use text or letter, not both" >&2
+    exit 2
+  fi
+  text="$EB_LETTER"
+fi
+if [[ -z "$text" ]]; then
+  echo "text must be a nonempty literal string" >&2
   exit 2
 fi
+case "${EB_CASE_SENSITIVE-false}" in
+  true|false) ;;
+  *) echo "case-sensitive must be true or false" >&2; exit 2 ;;
+esac
 if [[ "$EB_SINCE" != "7d" ]]; then
   echo "since currently supports exactly 7d" >&2
   exit 2
@@ -84,8 +97,11 @@ else
   counter_args=(
     --repo "$work/history.git" --ref "$source_ref"
     --repository "$EB_REPOSITORY" --project "$project"
-    --letter "$EB_LETTER" --since "$EB_SINCE" --out "$data"
+    --text "$text" --since "$EB_SINCE" --out "$data"
   )
+  if [[ "${EB_CASE_SENSITIVE-false}" == true ]]; then
+    counter_args+=(--case-sensitive)
+  fi
   if [[ -n "$EB_END" ]]; then
     counter_args+=(--end "$EB_END")
   fi

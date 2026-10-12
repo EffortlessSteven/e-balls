@@ -18,10 +18,16 @@ cargo fmt --all -- --check
 cargo clippy --release --locked --all-targets -- -D warnings
 cargo test --locked --all-targets
 cargo build --release --locked --bins
-EBALLS_BIN=target/release/e-balls python3 -m unittest discover -s tests -v
+EBALLS_BIN=target/release/e-balls EBALLS_COLLECT_BIN=target/release/e-balls-collect python3 -m unittest discover -s tests -v
 ```
 
 Count full raw messages, including trailers, by UTC committer date over a
 half-open window. Read one pinned Git ancestry, count every reachable SHA
 once (including merges), preserve zero days, and reject shallow history.
 The repeated portrait is presentation, not an assertion of commit authorship.
+
+`text` is a nonempty literal UTF-8 string, not a regex or a letter allowlist.
+Matching is non-overlapping per message; ASCII-only case folding is the default,
+and `case-sensitive` enables exact byte matching. `letter` remains an alias.
+Keep the q/2.0 roadmap and "other 29 letters" non-goal wording as jokes, not
+runtime restrictions. Preserve frozen examples and their original receipts.

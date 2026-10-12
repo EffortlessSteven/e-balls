@@ -47,6 +47,17 @@ Set `since: 7d` to count the last seven completed UTC days. The title reads "Occ
     since: 7d
 ```
 
+To count another string, set `text`:
+
+```yaml
+- uses: EffortlessSteven/e-balls@main
+  with:
+    text: 'fix:'
+    since: 7d
+```
+
+The saved data and manifest retain the full string. Long strings and characters outside the bundled font are abbreviated or escaped in the chart label only.
+
 ## Inputs
 
 | Input | Default | What it does |
@@ -55,7 +66,9 @@ Set `since: 7d` to count the last seven completed UTC days. The title reads "Occ
 | `ref` | default branch | Source branch or a reachable full commit SHA. |
 | `since` | `7d` | Last seven completed UTC days. |
 | `end` | today (UTC) | Optional exclusive UTC end date, such as `2026-10-11`. |
-| `letter` | `e` | ASCII letter to count, case-insensitively. |
+| `text` | `e` | Nonempty literal string to count. Words, punctuation and Unicode work too. |
+| `letter` | unset | Compatibility alias for `text`. |
+| `case-sensitive` | `false` | Exact UTF-8 matching; otherwise ASCII letter case is ignored. |
 | `project` | source repository name | Project name shown in the title. |
 | `avatar` | top contributor's GitHub avatar | Optional local PNG/JPEG override for every ball. |
 | `data` | unset | Re-render saved counts without reading Git (requires `avatar`). |
@@ -79,9 +92,10 @@ To use the files in another job, upload `directory` as an artifact.
 
 ## What gets counted
 
-- Only `e` and `E` in full commit messages count.
+- Occurrences of `text` in full commit messages count; by default, `e` and `E`.
+- Matches are literal and non-overlapping within each message: `aa` occurs twice in `aaaaa`. Non-ASCII text is matched as supplied, without case folding or normalization.
 - A commit in several merged branches counts once.
-- All authors' commits count. The avatar comes from the non-bot author with the most counted letters, resolving their GitHub account.
+- All authors' commits count. The avatar comes from the non-bot author with the most matches of the selected string, resolving their GitHub account.
 - The seven days are shown in calendar order, using UTC committer dates. Empty days stay still.
 - The fastest ball crosses in one second, so speeds are relative within a clip. Clips last 16 seconds. MP4 is 1080px at 60fps; GIF is 480px at 15fps.
 
@@ -104,7 +118,7 @@ git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
   --avatar top-contributor.png --format both
 ```
 
-Files go to `out/`. Useful flags: `--days`, `--start`, and `--end` for other windows; `--width`, `--fps`, and `--duration` for rendering. Run `--help` for the rest.
+Files go to `out/`. Use `--text "fix:"` (or the existing `--letter` alias) to count another string, and `--case-sensitive` for exact matching. Useful flags: `--days`, `--start`, and `--end` for other windows; `--width`, `--fps`, and `--duration` for rendering. Run `--help` for the rest.
 
 ## Roadmap
 

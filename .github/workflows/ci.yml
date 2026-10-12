@@ -88,6 +88,7 @@ jobs:
           name: e-balls-binaries-${{ github.event_name }}
           path: |
             target/release/e-balls
+            target/release/e-balls-collect
             target/release/release-balls
           if-no-files-found: ignore
           retention-days: 30
@@ -215,6 +216,53 @@ jobs:
           print(json.dumps({'winner':top['login'],'author_commits':top['authored_commits'],'counted_letters':top['counted_letters']},sort_keys=True))
           PY
           ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.gif" -f null -
+      - uses: ./
+        id: literal-string
+        with:
+          repository: EffortlessSteven/e-balls
+          ref: 2ac0374373eff3cf60c201565d7137c0ccedcbe8
+          project: release-balls
+          text: 'feat:'
+          case-sensitive: 'true'
+          since: 7d
+          end: '2026-09-29'
+          format: both
+          output: ${{ runner.temp }}/e-balls-literal-string
+      - name: Independently recount literal-string Action output
+        env:
+          BALLS_DIRECTORY: ${{ steps.literal-string.outputs.directory }}
+          BALLS_DATA: ${{ steps.literal-string.outputs.data }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
+            https://github.com/EffortlessSteven/e-balls.git "$RUNNER_TEMP/string-history.git"
+          git -C "$RUNNER_TEMP/string-history.git" config remote.origin.pushurl DISABLED
+          python3 scripts/verify_counts.py --repo "$RUNNER_TEMP/string-history.git" --data "$BALLS_DATA"
+          python3 - <<'PYCODE'
+          import json, os
+          from pathlib import Path
+          directory = Path(os.environ['BALLS_DIRECTORY'])
+          data = json.loads(Path(os.environ['BALLS_DATA']).read_text())
+          source = data['source']
+          matcher = {'kind':'literal','text':'feat:','case':'sensitive','overlapping':False}
+          assert source['matcher'] == matcher
+          assert source['commit'] == '2ac0374373eff3cf60c201565d7137c0ccedcbe8'
+          assert source['total_count'] > 0
+          assert source['top_contributor']['counted_matches'] > 0
+          assert source['top_contributor']['matcher'] == matcher
+          assert 'counted_letters' not in source['top_contributor']
+          assert json.loads((directory / 'manifest.json').read_text())['matcher'] == matcher
+          PYCODE
+          ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.gif" -f null -
+          ffmpeg -v error -xerror -i "$BALLS_DIRECTORY/e-balls.mp4" -f null -
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: e-balls-literal-string-${{ github.event_name }}
+          path: ${{ steps.literal-string.outputs.directory }}
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:

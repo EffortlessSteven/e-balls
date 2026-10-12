@@ -90,8 +90,8 @@ class CounterTests(unittest.TestCase):
         self.commit(b"eeee", parents=(a, b))
         data = self.collect()
         self.assertEqual(data["source"]["total_count"], 10)
-        self.assertEqual(data["source"]["total_commits"], 4)
         self.assertEqual(len({c["sha"] for c in data["source"]["commits"]}), 4)
+        self.assertEqual(data["source"]["total_commits"], 4)
 
     def test_unreachable_work_does_not_count(self):
         pin = self.commit(b"e")
@@ -118,9 +118,9 @@ class CounterTests(unittest.TestCase):
         self.commit(b"Aa ee a")
         self.assertEqual(self.collect(letter="A")["source"]["total_count"], 3)
 
-    def test_invalid_letter_and_window(self):
+    def test_invalid_text_and_window(self):
         self.commit(b"e")
-        for letter in ["", "ee", "é", "1"]:
+        for letter in ["", None, 1]:
             with self.subTest(letter=letter), self.assertRaises(ValueError):
                 self.collect(letter=letter)
         for end in [START, START - dt.timedelta(days=1), START + dt.timedelta(days=367)]:

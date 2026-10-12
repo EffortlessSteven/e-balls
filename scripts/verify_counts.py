@@ -17,6 +17,34 @@ def count_value(value, name):
     return value
 
 
+def matching_rules(source):
+    """Interpret versioned literal semantics independently of the Rust matcher."""
+    if "matcher" in source:
+        spec = source["matcher"]
+        if (not isinstance(spec, dict) or set(spec) != {"kind", "text", "case", "overlapping"}
+                or spec["kind"] != "literal" or spec["overlapping"] is not False
+                or spec["case"] not in ("sensitive", "ascii-insensitive")
+                or not isinstance(spec["text"], str) or not spec["text"]):
+            raise ValueError("invalid or unsupported matcher semantics")
+        needle = spec["text"].encode("utf-8")
+        sensitive = spec["case"] == "sensitive"
+        if not sensitive:
+            needle = needle.lower()
+        legacy_letter = (needle.decode("ascii") if not sensitive and len(needle) == 1
+                         and needle.isalpha() else None)
+        if "letter" in source and (not isinstance(source["letter"], str)
+                                   or source["letter"] != legacy_letter):
+            raise ValueError("legacy letter disagrees with matcher")
+        if "case" in source and (source["case"] != "ASCII-insensitive" or legacy_letter is None):
+            raise ValueError("legacy case disagrees with matcher")
+        return needle, sensitive
+    letter = source.get("letter")
+    if (not isinstance(letter, str) or not re.fullmatch(r"[a-z]", letter)
+            or source.get("case", "ASCII-insensitive") != "ASCII-insensitive"):
+        raise ValueError("source letter must be one lowercase ASCII letter")
+    return letter.encode("ascii"), False
+
+
 def verify(repo: Path, snapshot: Path) -> dict:
     """Verify one immutable input against complete, pinned Git history."""
     raw_data = snapshot.read_bytes()
@@ -44,10 +72,7 @@ def verify(repo: Path, snapshot: Path) -> dict:
     start, end = dates
     if not 1 <= (end - start).days <= 366:
         raise ValueError("window must contain 1–366 complete UTC days")
-    letter = source["letter"]
-    if not isinstance(letter, str) or not re.fullmatch(r"[a-z]", letter):
-        raise ValueError("source letter must be one lowercase ASCII letter")
-    needle = letter.encode("ascii")
+    needle, sensitive = matching_rules(source)
     counts, commits, receipts = Counter(), Counter(), {}
     # Unlike collection, use log for membership and read each object separately.
     for line in git("log", "--no-show-signature", "--no-notes", "--format=%H %ct", pin, "--").splitlines():
@@ -56,7 +81,7 @@ def verify(repo: Path, snapshot: Path) -> dict:
         if not start <= stamp < end:
             continue
         body = git("cat-file", "commit", sha).split(b"\n\n", 1)[1]
-        count = sum(byte in (needle[0], needle.upper()[0]) for byte in body)
+        count = (body if sensitive else body.lower()).count(needle)
         day = stamp.date().isoformat()
         committed_at = stamp.isoformat().replace("+00:00", "Z")
         counts[day] += count

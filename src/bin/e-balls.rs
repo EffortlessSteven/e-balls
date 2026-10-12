@@ -1,6 +1,7 @@
 use anyhow::{bail, Context, Result};
 use clap::Parser;
 use image::{ImageReader, Rgb, RgbImage};
+use release_balls::matching::LiteralMatcher;
 use release_balls::render::{render_with, Options, Presentation, Theme};
 use serde::Deserialize;
 use serde_json::json;
@@ -52,6 +53,8 @@ struct Data {
     #[serde(default)]
     unit_singular: Option<String>,
     rows: Vec<Row>,
+    #[serde(default)]
+    source: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -284,6 +287,12 @@ fn main() -> Result<()> {
     let bytes = read_bounded(&args.data, 32 * 1024 * 1024)?;
     let data: Data = serde_json::from_slice(&bytes).context("invalid rows JSON")?;
     data.validate()?;
+    let matcher = data
+        .source
+        .as_ref()
+        .filter(|source| source.get("matcher").is_some() || source.get("letter").is_some())
+        .map(LiteralMatcher::from_source)
+        .transpose()?;
     let image = portrait(&read_bounded(&args.avatar, 8 * 1024 * 1024)?)?;
     let presentation = Presentation {
         title: &data.title,
@@ -331,7 +340,7 @@ fn main() -> Result<()> {
     fs::write(staging.path.join("data.json"), &bytes)?;
     image.save(staging.path.join("avatar.png"))?;
     fs::write(staging.path.join("embed.md"), markdown)?;
-    let manifest = json!({
+    let mut manifest = json!({
         "schema_version": 1, "renderer": "e-balls", "markdown": "embed.md",
         "theme": {"name": "teal-cream", "background": "#f5f1e8", "foreground": "#156b76",
             "primary_font": "IBM Plex Sans Regular", "data_font": "IBM Plex Mono Regular",
@@ -340,6 +349,9 @@ fn main() -> Result<()> {
         "row_order": "input", "speed": "linear count / maximum; fastest crosses in 1 second",
         "duration_seconds": args.duration, "rows": rows, "files": files,
     });
+    if let Some(matcher) = matcher {
+        manifest["matcher"] = matcher.metadata();
+    }
     fs::write(
         staging.path.join("manifest.json"),
         format!("{}\n", serde_json::to_string_pretty(&manifest)?),
