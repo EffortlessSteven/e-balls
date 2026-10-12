@@ -106,6 +106,14 @@ git clone --bare --filter=blob:none --single-branch --branch main --no-tags \
 
 Files go to `out/`. Useful flags: `--days`, `--start`, and `--end` for other windows; `--width`, `--fps`, and `--duration` for rendering. Run `--help` for the rest.
 
+## Roadmap
+
+- [ ] Add support for the letter `q` by 2.0.
+
+## Non-goals
+
+The other 29 letters of the alphabet.
+
 ## More
 
 The original Release Balls action is available in [legacy](legacy/action.yml); see [release publishing details](docs/releases.md).
