@@ -74,7 +74,7 @@ runs:
         echo "key=e-balls-v2-rust1.88.0-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-$os}-$digest" >> "$GITHUB_OUTPUT"
         printf 'renderer=%s\n' "$(realpath -m "$GITHUB_ACTION_PATH/target/release/e-balls")" >> "$GITHUB_OUTPUT"
         printf 'collector=%s\n' "$(realpath -m "$GITHUB_ACTION_PATH/target/release/e-balls-collect")" >> "$GITHUB_OUTPUT"
-    - uses: actions/cache/restore@v4
+    - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       id: binary
       with:
         path: |
@@ -109,8 +109,10 @@ runs:
           ready=true
         fi
         echo "value=$ready" >> "$GITHUB_OUTPUT"
-    - uses: dtolnay/rust-toolchain@1.88.0
+    - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master; Rust 1.88.0
       if: steps.ready.outputs.value != 'true'
+      with:
+        toolchain: '1.88.0'
     - id: build
       name: Build e-balls on cache miss
       if: steps.ready.outputs.value != 'true'
@@ -123,7 +125,7 @@ runs:
         fi
         cargo build --release --locked --manifest-path "$GITHUB_ACTION_PATH/Cargo.toml" --bin e-balls --bin e-balls-collect
     - name: Save binaries before collecting repository data
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       if: steps.binary.outputs.cache-hit != 'true' && steps.build.outcome == 'success'
       with:
         path: |
