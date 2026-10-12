@@ -165,6 +165,31 @@ impl Drop for Staging {
     }
 }
 
+// Join every encoder before returning, including on error, so the staging
+// directory cannot be removed while another encoder still owns an output file.
+fn render_formats(
+    format: &str,
+    parallel: bool,
+    render: impl Fn(&str) -> Result<serde_json::Value> + Sync,
+) -> Result<Vec<serde_json::Value>> {
+    if format == "both" && parallel {
+        std::thread::scope(|scope| {
+            let gif = scope.spawn(|| render("gif"));
+            let mp4 = render("mp4");
+            let gif = gif
+                .join()
+                .map_err(|_| anyhow::anyhow!("GIF encoder thread panicked"))?;
+            Ok(vec![mp4?, gif?])
+        })
+    } else {
+        ["mp4", "gif"]
+            .into_iter()
+            .filter(|candidate| format == "both" || format == *candidate)
+            .map(render)
+            .collect()
+    }
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
     if !(320..=2160).contains(&args.width)
@@ -206,11 +231,9 @@ fn main() -> Result<()> {
     let stamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
     let staging = Staging::create(parent.join(format!(".e-balls-{}-{stamp}", std::process::id())))?;
     let stem = staging.path.join("e-balls");
-    let mut files = Vec::new();
-    for format in ["mp4", "gif"] {
-        if args.format != "both" && args.format != format {
-            continue;
-        }
+    let parallel =
+        args.threads > 1 && std::thread::available_parallelism().is_ok_and(|cores| cores.get() > 1);
+    let files = render_formats(&args.format, parallel, |format| {
         let options = Options {
             width: if format == "gif" { 480 } else { args.width },
             fps: if format == "gif" { 15 } else { args.fps },
@@ -220,12 +243,12 @@ fn main() -> Result<()> {
             strategy: if format == "gif" { "dirty" } else { "yuv" }.into(),
         };
         render_with(&rows, &presentation, &stem, &[format], &options)?;
-        files.push(json!({
+        Ok(json!({
             "path": format!("e-balls.{format}"),
             "width": options.width,
             "fps": options.fps,
-        }));
-    }
+        }))
+    })?;
     // Freeze the exact input, including any source receipts not interpreted by this CLI.
     fs::write(staging.path.join("data.json"), &bytes)?;
     image.save(staging.path.join("avatar.png"))?;
@@ -250,6 +273,63 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parallel_formats_overlap_but_keep_manifest_order() -> Result<()> {
+        let barrier = std::sync::Barrier::new(2);
+        let formats = render_formats("both", true, |format| {
+            barrier.wait();
+            Ok(json!(format))
+        })?;
+        assert_eq!(formats, vec![json!("mp4"), json!("gif")]);
+        Ok(())
+    }
+
+    #[test]
+    fn format_error_waits_for_other_encoder() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let finished = AtomicBool::new(false);
+        let result = render_formats("both", true, |format| {
+            if format == "mp4" {
+                bail!("synthetic encoder failure");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            finished.store(true, Ordering::SeqCst);
+            Ok(json!(format))
+        });
+        assert!(result.is_err());
+        assert!(finished.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn worker_panic_becomes_a_render_error() {
+        let result = render_formats("both", true, |format| {
+            if format == "gif" {
+                panic!("synthetic worker failure");
+            }
+            Ok(json!(format))
+        });
+        assert!(result.unwrap_err().to_string().contains("panicked"));
+    }
+
+    #[test]
+    fn serial_and_single_formats_preserve_selection() -> Result<()> {
+        for parallel in [false, true] {
+            assert_eq!(
+                render_formats("mp4", parallel, |format| Ok(json!(format)))?,
+                vec![json!("mp4")]
+            );
+            assert_eq!(
+                render_formats("gif", parallel, |format| Ok(json!(format)))?,
+                vec![json!("gif")]
+            );
+        }
+        assert_eq!(
+            render_formats("both", false, |format| Ok(json!(format)))?,
+            vec![json!("mp4"), json!("gif")]
+        );
+        Ok(())
+    }
 
     fn value() -> serde_json::Value {
         json!({"schema_version":1,"title":"e","footer":"source","unit":"e's",
